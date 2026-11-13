@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en" data-theme="system" data-mode="daily">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Mordle</title>
+  <meta name="description" content="Mordle: guess the five-letter word. Daily puzzle, random seeds, and an endless InfiniMode.">
+  <meta name="theme-color" content="#0f1424">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,500;9..40,700;9..40,800&family=Fraunces:opsz,wght@9..144,900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/board.css">
+  <link rel="stylesheet" href="css/keyboard.css">
+  <link rel="stylesheet" href="css/dialogs.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-bar">
+        <button class="icon-btn" id="help-btn" type="button" aria-label="How to play" data-icon="help"></button>
+        <h1 class="wordmark" aria-label="Mordle">Mor<span class="wordmark-d">d</span>le</h1>
+        <div class="header-right">
+          <button class="icon-btn" id="stats-btn" type="button" aria-label="Statistics" data-icon="stats"></button>
+          <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings" data-icon="gear"></button>
+        </div>
+      </div>
+      <div class="mode-wrap">
+        <button class="mode-chip" id="mode-chip" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="mode-menu">
+          <span id="mode-label">Daily</span>
+          <span class="chev" data-icon="chevron" aria-hidden="true"></span>
+        </button>
+        <div class="mode-menu" id="mode-menu" role="menu" hidden>
+          <button type="button" role="menuitemradio" data-mode="daily"><span class="dot"></span><span class="name">Daily</span><span class="meta" data-meta="daily"></span></button>
+          <button type="button" role="menuitemradio" data-mode="random"><span class="dot"></span><span class="name">Random</span><span class="meta" data-meta="random"></span></button>
+          <button type="button" role="menuitemradio" data-mode="infini"><span class="dot"></span><span class="name">∞ InfiniMode</span><span class="meta" data-meta="infini">unlimited guesses</span></button>
+        </div>
+      </div>
+    </header>
+
+    <main class="board-area" id="board-area">
+      <div class="board" id="board" aria-label="Game board"></div>
+    </main>
+
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+    <div class="sr-only" id="announcer" aria-live="polite"></div>
+
+    <div class="keyboard" id="keyboard" aria-label="Keyboard"></div>
+  </div>
+
+  <!-- How to play -->
+  <dialog class="modal" id="help-dialog" aria-labelledby="help-title">
+    <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
+    <h2 id="help-title">How to play</h2>
+    <p>Guess the five-letter word. Each guess has to be a real word. After you guess, the tiles change color to show how close you were.</p>
+    <div class="example">
+      <div class="mini-row" data-example="w:correct,r,i,t,e"></div>
+      <p><b class="t-correct">W</b> is in the word and in the right spot.</p>
+    </div>
+    <div class="example">
+      <div class="mini-row" data-example="s,t:present,o,r,m"></div>
+      <p><b class="t-present">T</b> is in the word, but in a different spot.</p>
+    </div>
+    <div class="example">
+      <div class="mini-row" data-example="c,l,o:absent,u,d"></div>
+      <p><b class="t-absent">O</b> isn't in the word at all.</p>
+    </div>
+    <h3>Modes</h3>
+    <ul class="mode-list">
+      <li><span class="dot" style="--dot: var(--mode-daily)"></span><b>Daily</b>: one word a day, the same for everyone. You get 6 guesses.</li>
+      <li><span class="dot" style="--dot: var(--mode-random)"></span><b>Random</b>: a random word, or enter a seed to share a word with friends.</li>
+      <li><span class="dot" style="--dot: var(--mode-infini)"></span><b>InfiniMode</b>: unlimited guesses. Keep going until you get it.</li>
+    </ul>
+  </dialog>
+
+  <!-- Settings -->
+  <dialog class="modal" id="settings-dialog" aria-labelledby="settings-title">
+    <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
+    <h2 id="settings-title">Settings</h2>
+
+    <div class="setting">
+      <div>
+        <div class="setting-name">Hard mode</div>
+        <div class="setting-hint" id="hard-hint">Any letters you've found must be used in later guesses.</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="hard-toggle"><span></span><span class="sr-only">Hard mode</span></label>
+    </div>
+
+    <div class="setting">
+      <div>
+        <div class="setting-name">High contrast</div>
+        <div class="setting-hint">Stronger colors that are easier to tell apart.</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="contrast-toggle"><span></span><span class="sr-only">High contrast</span></label>
+    </div>
+
+    <div class="setting setting-col">
+      <div class="setting-name">Theme</div>
+      <div class="segmented" id="theme-seg" role="radiogroup" aria-label="Theme">
+        <button type="button" role="radio" data-theme-choice="system">System</button>
+        <button type="button" role="radio" data-theme-choice="dark">Dark</button>
+        <button type="button" role="radio" data-theme-choice="light">Light</button>
+      </div>
+    </div>
+
+    <div class="setting setting-col">
+      <div class="setting-name">Seed</div>
+      <div class="setting-hint" id="seed-current"></div>
+      <form class="seed-form" id="seed-form">
+        <input id="seed-input" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Seed number">
+        <button class="btn btn-primary" type="submit">Play seed</button>
+      </form>
+      <button class="btn btn-secondary btn-block" type="button" id="new-random-btn">New random word</button>
+    </div>
+  </dialog>
+
+  <!-- Results / stats bottom sheet -->
+  <dialog class="sheet" id="stats-dialog" aria-labelledby="stats-title">
+    <div class="grab" aria-hidden="true"></div>
+    <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
+    <div class="hero" id="result-hero">
+      <h2 class="hero-title" id="stats-title">Statistics</h2>
+      <div class="answer-tiles" id="answer-tiles"></div>
+    </div>
+    <div id="stats-body">
+      <div class="stats4">
+        <div><div class="num" id="st-played">0</div><div class="cap">Played</div></div>
+        <div><div class="num" id="st-win">0</div><div class="cap">Win %</div></div>
+        <div><div class="num" id="st-streak">0</div><div class="cap">Streak</div></div>
+        <div><div class="num" id="st-best">0</div><div class="cap">Best</div></div>
+      </div>
+      <h3 class="section-label" id="dist-label">Guess distribution</h3>
+      <div class="dist" id="dist"></div>
+    </div>
+    <p class="infini-note" id="infini-note" hidden>InfiniMode games aren't counted in your stats.</p>
+    <div class="sheet-actions">
+      <button class="btn btn-primary" type="button" id="share-btn"><span data-icon="share"></span>Share</button>
+      <button class="btn btn-secondary" type="button" id="play-random-btn">Play Random</button>
+    </div>
+    <p class="countdown">Next daily in <b id="countdown">--:--:--</b></p>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

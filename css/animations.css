@@ -1,0 +1,66 @@
+/* "Juicy" motion. JS adds these classes; timings in js/ui/board.js match. */
+
+.tile.pop { animation: pop .18s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes pop {
+  0% { transform: scale(.7) rotate(-6deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* Color is swapped by JS at the midpoint (45%), when the tile is edge-on */
+.tile.flip { animation: flip .55s cubic-bezier(.5, 0, .3, 1.4) both; }
+@keyframes flip {
+  0% { transform: rotateY(0) scale(1); }
+  45% { transform: rotateY(90deg) scale(.9); }
+  100% { transform: rotateY(0) scale(1); }
+}
+
+.row.shake { animation: shake .5s; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-9px) rotate(-2deg); }
+  40% { transform: translateX(8px) rotate(2deg); }
+  60% { transform: translateX(-6px) rotate(-1deg); }
+  80% { transform: translateX(4px); }
+}
+
+.tile.win { animation: win .9s cubic-bezier(.3, 1.6, .5, 1) both; box-shadow: 0 0 18px color-mix(in srgb, var(--correct) 55%, transparent); }
+@keyframes win {
+  0% { transform: scale(1); }
+  30% { transform: translateY(-22px) scale(1.15) rotate(-8deg); }
+  60% { transform: translateY(0) scale(.95); }
+  100% { transform: scale(1); }
+}
+
+.spark {
+  position: fixed; z-index: 60; width: 7px; height: 7px; border-radius: 50%;
+  pointer-events: none; animation: spark .8s ease-out forwards;
+}
+@keyframes spark {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.3); opacity: 0; }
+}
+
+.toast { animation: toast-in .35s cubic-bezier(.3, 1.6, .5, 1) both; }
+.toast.out { animation: toast-out .2s ease-in forwards; }
+@keyframes toast-in { from { transform: translateY(-14px) scale(.9); opacity: 0; } }
+@keyframes toast-out { to { transform: translateY(-8px); opacity: 0; } }
+
+.sheet[open] { animation: sheet-up .42s cubic-bezier(.3, 1.3, .5, 1); }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+.modal[open] { animation: modal-in .3s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes modal-in { from { transform: scale(.92) translateY(10px); opacity: 0; } }
+dialog[open]::backdrop { animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; } }
+
+.mode-menu:not([hidden]) { animation: menu-in .22s cubic-bezier(.3, 1.5, .5, 1); transform-origin: top center; }
+@keyframes menu-in { from { transform: scale(.9) translateY(-6px); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .spark { display: none; }
+}

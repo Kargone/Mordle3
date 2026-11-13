@@ -1,0 +1,35 @@
+/* Pill keys in a raised tray */
+.keyboard {
+  background: var(--tray);
+  border-radius: 20px;
+  padding: 10px 6px;
+  display: grid;
+  gap: 7px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 20px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.kb-row { display: flex; gap: 5px; justify-content: center; }
+.kb-row.mid { padding: 0 5%; }
+
+.key {
+  flex: 1 1 0;
+  max-width: 44px;
+  height: clamp(44px, 7dvh, 54px);
+  border-radius: 999px;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: clamp(14px, 4vw, 17px);
+  text-transform: uppercase;
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: 0 3px 0 var(--raised-lip);
+  transition: background-color .2s ease, color .2s ease, transform .08s ease, box-shadow .08s ease;
+}
+.key.wide { flex-grow: 1.6; max-width: 68px; }
+.key svg { width: 22px; height: 22px; }
+.key:active, .key.pressed { transform: translateY(2px); box-shadow: 0 1px 0 var(--raised-lip); }
+
+.key[data-state='correct'] { background: var(--correct-bg); color: var(--correct-fg); box-shadow: 0 3px 0 var(--correct-lip); }
+.key[data-state='present'] { background: var(--present-bg); color: var(--present-fg); box-shadow: 0 3px 0 var(--present-lip); }
+.key[data-state='absent']  { background: var(--key-absent-bg); color: var(--key-absent-fg); box-shadow: none; }

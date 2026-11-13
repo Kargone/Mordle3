@@ -1,0 +1,136 @@
+/* Midnight Ink design tokens. Dark is the default; light and high-contrast override below. */
+:root {
+  color-scheme: dark;
+
+  --bg: #0f1424;
+  --surface: #161d33;
+  --tray: #161d33;
+  --surface-2: #1a2140;
+  --raised: #262f52;
+  --raised-lip: #10162a;
+  --line: #1f2744;
+  --text: #e8ecf6;
+  --text-dim: #8a93b4;
+  --text-faint: #4c5472;
+
+  /* tiles */
+  --tile-empty: #19203a;
+  --tile-filled: #232c4d;
+  --tile-filled-ring: #4a5684;
+
+  /* status: tinted block + glowing letter */
+  --correct: #2bb5a0;
+  --correct-bg: rgba(43, 181, 160, 0.3);
+  --correct-fg: #7ff0dc;
+  --correct-lip: rgba(20, 90, 80, 0.8);
+  --present: #f2a541;
+  --present-bg: rgba(242, 165, 65, 0.28);
+  --present-fg: #ffd08a;
+  --present-lip: rgba(120, 75, 10, 0.8);
+  --absent-bg: #232a42;
+  --absent-fg: #6f7898;
+  --key-absent-bg: #1a2038;
+  --key-absent-fg: #4c5472;
+
+  /* per-mode accents */
+  --mode-daily: #2bb5a0;
+  --mode-daily-fg: #7ff0dc;
+  --mode-random: #f2a541;
+  --mode-random-fg: #ffd08a;
+  --mode-infini: #a78bfa;
+  --mode-infini-fg: #cbbcff;
+
+  --accent: var(--mode-daily);
+  --accent-fg: var(--mode-daily-fg);
+
+  --shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(5, 8, 18, 0.6);
+
+  --font-ui: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+
+  --radius-tile: 30%;
+  --gap: 6px;
+}
+
+[data-mode='random'] { --accent: var(--mode-random); --accent-fg: var(--mode-random-fg); }
+[data-mode='infini'] { --accent: var(--mode-infini); --accent-fg: var(--mode-infini-fg); }
+
+/* ---------- Light theme ---------- */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f3f5fb;
+  --surface: #ffffff;
+  --tray: #dfe4f0;
+  --surface-2: #eef1f8;
+  --raised: #ffffff;
+  --raised-lip: #c9d0e3;
+  --line: #e0e5f1;
+  --text: #141a2e;
+  --text-dim: #5d6685;
+  --text-faint: #a3abc4;
+  --tile-empty: #e4e8f3;
+  --tile-filled: #ffffff;
+  --tile-filled-ring: #8e98bb;
+  --correct-bg: rgba(43, 181, 160, 0.24);
+  --correct-fg: #0b6e60;
+  --correct-lip: rgba(20, 120, 105, 0.45);
+  --present-bg: rgba(242, 165, 65, 0.28);
+  --present-fg: #96560a;
+  --present-lip: rgba(170, 100, 10, 0.45);
+  --absent-bg: #d4d9e7;
+  --absent-fg: #727b98;
+  --key-absent-bg: #dde1ec;
+  --key-absent-fg: #9aa2bb;
+  --mode-daily-fg: #0b6e60;
+  --mode-random-fg: #96560a;
+  --mode-infini-fg: #5b3fc4;
+  --shadow: 0 20px 40px rgba(20, 26, 46, 0.18);
+  --scrim: rgba(20, 26, 46, 0.35);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    color-scheme: light;
+    --bg: #f3f5fb;
+    --surface: #ffffff;
+    --tray: #dfe4f0;
+    --surface-2: #eef1f8;
+    --raised: #ffffff;
+    --raised-lip: #c9d0e3;
+    --line: #e0e5f1;
+    --text: #141a2e;
+    --text-dim: #5d6685;
+    --text-faint: #a3abc4;
+    --tile-empty: #e4e8f3;
+    --tile-filled: #ffffff;
+    --tile-filled-ring: #8e98bb;
+    --correct-bg: rgba(43, 181, 160, 0.24);
+    --correct-fg: #0b6e60;
+    --correct-lip: rgba(20, 120, 105, 0.45);
+    --present-bg: rgba(242, 165, 65, 0.28);
+    --present-fg: #96560a;
+    --present-lip: rgba(170, 100, 10, 0.45);
+    --absent-bg: #d4d9e7;
+    --absent-fg: #727b98;
+    --key-absent-bg: #dde1ec;
+    --key-absent-fg: #9aa2bb;
+    --mode-daily-fg: #0b6e60;
+    --mode-random-fg: #96560a;
+    --mode-infini-fg: #5b3fc4;
+    --shadow: 0 20px 40px rgba(20, 26, 46, 0.18);
+    --scrim: rgba(20, 26, 46, 0.35);
+  }
+}
+
+/* ---------- High contrast: solid, colorblind-friendly fills ---------- */
+:root[data-contrast='high'] {
+  --correct: #f5793a;
+  --correct-bg: #f5793a;
+  --correct-fg: #1a0a00;
+  --correct-lip: #a8481a;
+  --present: #85c0f9;
+  --present-bg: #85c0f9;
+  --present-fg: #04203d;
+  --present-lip: #3f7fc0;
+}
