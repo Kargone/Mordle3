@@ -1,0 +1,11 @@
+{
+  "name": "mordle3",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mordle — a daily five-letter word game. Plain HTML/CSS/JS, no build step.",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "start": "npx --yes serve@14.2.4 ."
+  }
+}
