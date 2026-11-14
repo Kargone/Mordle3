@@ -36,6 +36,8 @@ export function createCloud(config, hooks) {
   let unsubscribe = null;
   let state = { status: config ? 'connecting' : 'off' };
   let flushing = null;
+  let session = null; // { fb, db, uid, name } once signed in
+  const waiters = [];
 
   const pending = () => load('pending', []);
   const emit = (patch) => {
@@ -101,6 +103,8 @@ export function createCloud(config, hooks) {
     }
 
     emit(describe(user));
+    session = { fb, db, uid: user.uid, name: user.displayName || '' };
+    waiters.splice(0).forEach((resolve) => resolve(session));
     unsubscribe = fb.onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       const d = snap.data();
@@ -133,6 +137,13 @@ export function createCloud(config, hooks) {
   return {
     start,
     get state() { return state; },
+    get enabled() { return !!config; },
+
+    /** Firestore access for battle mode. Resolves once signed in (anonymously or with Google). */
+    session() {
+      if (session) return Promise.resolve(session);
+      return new Promise((resolve) => waiters.push(resolve));
+    },
 
     /** Call when a Daily or Random game finishes (after recording it locally). */
     record(result) {
@@ -176,6 +187,7 @@ export function createCloud(config, hooks) {
       unsubscribe?.();
       unsubscribe = null;
       ref = null;
+      session = null;
       // Stats are safe in the Google account. Start this device fresh so they
       // aren't merged in a second time on the next sign-in.
       save('pending', []);

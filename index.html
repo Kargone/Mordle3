@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="css/board.css">
   <link rel="stylesheet" href="css/keyboard.css">
   <link rel="stylesheet" href="css/dialogs.css">
+  <link rel="stylesheet" href="css/battle.css">
   <link rel="stylesheet" href="css/animations.css">
 </head>
 <body>
@@ -37,6 +38,7 @@
           <button type="button" role="menuitemradio" data-mode="daily"><span class="dot"></span><span class="name">Daily</span><span class="meta" data-meta="daily"></span></button>
           <button type="button" role="menuitemradio" data-mode="random"><span class="dot"></span><span class="name">Random</span><span class="meta" data-meta="random"></span></button>
           <button type="button" role="menuitemradio" data-mode="infini"><span class="dot"></span><span class="name">∞ InfiniMode</span><span class="meta" data-meta="infini">unlimited guesses</span></button>
+          <button type="button" role="menuitemradio" data-mode="battle" hidden><span class="dot"></span><span class="name">⚔ Battle</span><span class="meta" data-meta="battle">take turns with friends</span></button>
         </div>
       </div>
     </header>
@@ -46,6 +48,60 @@
       <main class="board-area" id="board-area">
         <div class="board" id="board" aria-label="Game board"></div>
       </main>
+
+      <!-- Battle: race screen -->
+      <section class="battle-area" id="battle-area" hidden aria-label="Battle">
+        <div class="turn-strip" id="turn-strip"></div>
+        <div class="battle-scroll" id="battle-scroll"><div class="battle-board" id="battle-board" aria-label="Shared board"></div></div>
+      </section>
+
+      <!-- Battle: lobby browser -->
+      <section class="panel" id="battle-lobby" hidden aria-labelledby="battle-lobby-title">
+        <h2 id="battle-lobby-title">Battle</h2>
+        <p class="panel-hint">Take turns on one shared board. First to find the word wins the round.</p>
+        <label class="field"><span>Your name</span><input id="battle-name" maxlength="16" autocomplete="nickname" placeholder="Player"></label>
+        <button class="btn btn-primary btn-block" type="button" id="battle-create">+ Create room</button>
+        <form class="codebox" id="battle-join-form">
+          <input id="battle-code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Room code" aria-label="Room code">
+          <button class="btn btn-secondary" type="submit">Join</button>
+        </form>
+        <h3 class="section-label">Open rooms</h3>
+        <div class="room-list" id="battle-rooms"></div>
+      </section>
+
+      <!-- Battle: room, waiting to start -->
+      <section class="panel" id="battle-room" hidden aria-labelledby="room-title">
+        <h2 id="room-title">Room</h2>
+        <div class="room-link">
+          <code id="room-code"></code><span id="room-url"></span>
+          <button class="btn btn-secondary" type="button" id="room-copy">Copy link</button>
+        </div>
+        <div class="room-players" id="room-players"></div>
+        <label class="field"><span>Your name</span><input id="room-name" maxlength="16" autocomplete="nickname" placeholder="Player"></label>
+        <div class="setting" data-setting="turnSecs">
+          <div class="setting-name">Turn timer</div>
+          <div class="stepper"><button type="button" data-step="-1" aria-label="Less">−</button><span class="val"></span><button type="button" data-step="1" aria-label="More">+</button></div>
+        </div>
+        <div class="setting" data-setting="rounds">
+          <div class="setting-name">Rounds</div>
+          <div class="stepper"><button type="button" data-step="-1" aria-label="Less">−</button><span class="val"></span><button type="button" data-step="1" aria-label="More">+</button></div>
+        </div>
+        <div class="setting" data-setting="maxPlayers">
+          <div class="setting-name">Max players</div>
+          <div class="stepper"><button type="button" data-step="-1" aria-label="Less">−</button><span class="val"></span><button type="button" data-step="1" aria-label="More">+</button></div>
+        </div>
+        <div class="setting">
+          <div><div class="setting-name">Hard mode</div><div class="setting-hint">Every guess must use all hints so far, from anyone.</div></div>
+          <label class="switch"><input type="checkbox" id="room-hard"><span></span><span class="sr-only">Hard mode</span></label>
+        </div>
+        <div class="setting">
+          <div><div class="setting-name">Public</div><div class="setting-hint">Show this room in the open rooms list.</div></div>
+          <label class="switch"><input type="checkbox" id="room-public"><span></span><span class="sr-only">Public</span></label>
+        </div>
+        <button class="btn btn-primary btn-block" type="button" id="room-start">Start</button>
+        <p class="waiting" id="room-wait"></p>
+        <p class="center"><button class="linkbtn" type="button" id="room-leave">Leave room</button></p>
+      </section>
     </div>
 
     <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
@@ -159,6 +215,22 @@
       <button class="btn btn-secondary" type="button" id="play-random-btn">Play Random</button>
     </div>
     <p class="countdown">Next daily in <b id="countdown">--:--:--</b></p>
+  </dialog>
+
+  <!-- Battle: round over -->
+  <dialog class="sheet" id="round-dialog" aria-labelledby="round-title">
+    <div class="grab" aria-hidden="true"></div>
+    <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
+    <div class="podium">
+      <div class="av" id="round-av" aria-hidden="true"></div>
+      <h2 id="round-title">Round over</h2>
+      <div class="answer-tiles" id="round-answer"></div>
+      <p class="round-meta" id="round-meta"></p>
+    </div>
+    <div class="score-table" id="round-table"></div>
+    <button class="btn btn-primary btn-block" type="button" id="round-next">Next round</button>
+    <p class="waiting" id="round-wait"></p>
+    <p class="center"><button class="linkbtn" type="button" id="round-leave">Leave room</button></p>
   </dialog>
 
   <script type="module" src="js/main.js"></script>

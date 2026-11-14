@@ -9,6 +9,7 @@ Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies
 - **Daily:** one word per day (changes at local midnight), the same for everyone.
 - **Random:** a random word, or enter a seed (0–2308) to play a specific word. Share links include the seed (`?seed=1795`).
 - **InfiniMode:** unlimited guesses. The board scrolls as you go.
+- **Battle (needs Firebase):** 2–8 players take turns on one shared board with a turn timer. Type your next guess while you wait. First to find the word wins the round. Share a room link or pick a room from the lobby.
 - **Hard mode:** any letters you've found must be used in later guesses.
 - **Stats and streaks** for Daily and Random, with a guess-distribution chart.
 - **Share** your result as an emoji grid.
@@ -52,6 +53,14 @@ Sync is off until `js/firebase-config.js` has a config. Without it the game work
 
 How it works: every player is signed in anonymously in the background and gets a `users/{uid}` document. Signing in with Google links that account. If the Google account already has stats from another device, this device's stats are merged in once (counts added, best streak kept, a daily played on both devices counted once). Finished games go into a small queue and are applied to the cloud stats in a transaction, so devices never overwrite each other and games played offline upload later. Today's daily also syncs: submitted guesses are saved as you play, and whichever device is further along wins, so you can start on your phone and finish on your laptop. Settings (hard mode, theme, contrast) follow the most recent change. Signing out clears stats from this device; they stay in the Google account.
 
+## Battle mode
+
+Rooms live in Firestore at `rooms/{code}` (4-character codes like `KQ7P`; links are `?battle=KQ7P`). Each action (join, guess, skip, next round, leave) runs in a transaction through a pure function in `js/battle/logic.js`, so players acting at the same time can't overwrite each other.
+
+- **Turns:** the current player's device ends their own turn when the timer runs out; everyone else skips it 3 seconds later as a backup (e.g. if that phone went to sleep).
+- **Presence:** each player sends a heartbeat every 20 seconds. Anyone quiet for 60 seconds is skipped in the turn order, and if the host goes quiet the next player becomes host.
+- **Trust:** there's no server checking guesses (that needs Cloud Functions on the Blaze plan). The rules keep strangers out of rooms and stop non-hosts changing settings, but players in a room could cheat. Fine for playing with friends.
+
 ## Project layout
 
 ```
@@ -67,6 +76,7 @@ js/cloud.js         Firebase sign-in and Firestore sync
 js/firebase-config.js  Firebase config (null = sync off)
 js/words.js         answer and guess word lists
 js/ui/              board, keyboard, toasts, results sheet, account, icons, motion
+js/battle/          battle rules (logic.js), Firestore rooms (net.js), screens (view.js), controller
 js/main.js          wires everything together
 tests/              unit tests
 docs/               design decisions

@@ -2,15 +2,19 @@
 
 ## Later (not part of the first release)
 
-- [ ] **Battle mode**: head-to-head races where two or more players get the same word. First to solve wins; ties go to fewer guesses.
+- [x] **Battle mode**: 2–8 players take turns on one shared board (turn timer, skip on timeout, type ahead). First to find the word wins the round. Room links + public lobby browser.
+  - [ ] Publish the updated `firestore.rules` (adds `rooms`), then test with real devices
+  - [ ] Optional: Firestore TTL policy on `rooms` so abandoned rooms get deleted (rooms with nobody present are already hidden from the lobby)
+  - [ ] Ideas: battle stats (wins per player), quick rematch with new players, emoji reactions
 - [ ] **Firebase sync**
   - [x] **Set up the Firebase project** (see README → Sync)
   - [x] Auth: anonymous sign-in, with optional Google sign-in to link devices
   - [x] Sync stats, streaks and settings across devices (Firestore). Merge with existing localStorage data on first sign-in.
   - [x] Sync the in-progress daily, so a half-played daily continues on another device
   - [ ] Re-publish `firestore.rules` whenever it changes (Firestore → Rules)
-  - [ ] Real-time backend for battle mode: lobbies, presence, live opponent progress (Firestore listeners or Realtime Database)
-  - [ ] Security rules so players can only write their own data; validate battle results on the server (Cloud Functions)
+  - [x] Real-time backend for battle mode: rooms in Firestore with live listeners, heartbeat presence
+  - [x] Security rules so players can only write their own data
+  - [ ] (Needs Blaze plan) validate battle guesses on the server with Cloud Functions so results can't be faked
   - Note: `js/storage.js` and `js/stats.js` are kept separate so a Firebase-backed store can replace or wrap them.
 - [x] Scroll bar UI revamp: hidden bar + "↑ N earlier rows" jump pill
 - [x] InfiniMode scrolls to the very bottom

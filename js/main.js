@@ -15,11 +15,12 @@ import { createKeyboard } from './ui/keyboard.js';
 import { createToaster } from './ui/toast.js';
 import { createResultsSheet, praiseFor } from './ui/results.js';
 import { createAccountUI } from './ui/account.js';
+import { createBattle } from './battle/controller.js';
 import { wait } from './ui/motion.js';
 
 const $ = (id) => document.getElementById(id);
 const root = document.documentElement;
-const MODES = ['daily', 'random', 'infini'];
+const MODES = ['daily', 'random', 'infini', 'battle'];
 
 // ---------- persisted state ----------
 const settings = { mode: 'daily', hard: false, theme: 'system', contrast: false, ...load('settings', {}) };
@@ -58,10 +59,12 @@ function slotFor(mode) {
   return slot;
 }
 
-let mode = MODES.includes(settings.mode) ? settings.mode : 'daily';
+let mode = MODES.includes(settings.mode) && (settings.mode !== 'battle' || firebaseConfig) ? settings.mode : 'daily';
 let busy = false; // true while a row is revealing
 
 const current = () => slotFor(mode);
+/** Solo mode whose settings apply while Battle is on screen. */
+const soloMode = () => (mode === 'battle' ? 'daily' : mode);
 
 // ---------- UI ----------
 applyIcons();
@@ -114,6 +117,9 @@ const account = createAccountUI({
   },
 });
 
+const battle = createBattle({ cloud, keyboard, toast, announce, onHeader: renderHeader });
+$('mode-menu').querySelector('[data-mode="battle"]').hidden = !cloud.enabled;
+
 /** Keep whichever copy of today's daily is further along. */
 let lastRemoteDaily = null;
 function syncDaily(remoteData = lastRemoteDaily) {
@@ -146,14 +152,18 @@ function announce(text) {
 }
 
 function renderHeader() {
-  const slot = current();
   root.dataset.mode = mode;
-  const label = {
-    daily: `Daily #${slot.day}`,
-    random: `Random · seed ${slot.seed}`,
-    infini: `∞ Infini · seed ${slot.seed}`,
-  }[mode];
-  $('mode-label').textContent = label;
+  if (mode === 'battle') {
+    $('mode-label').textContent = battle.label;
+  } else {
+    const slot = current();
+    $('mode-label').textContent = {
+      daily: `Daily #${slot.day}`,
+      random: `Random · seed ${slot.seed}`,
+      infini: `∞ Infini · seed ${slot.seed}`,
+    }[mode];
+  }
+  document.querySelector('[data-meta="battle"]').textContent = battle.inRoom ? "you're in a room" : 'take turns with friends';
   document.querySelector('[data-meta="daily"]').textContent = `#${dayNumber()} · same for everyone`;
   document.querySelector('[data-meta="random"]').textContent = games.random ? `seed ${games.random.seed}` : 'random word';
   document.querySelector('[data-meta="infini"]').textContent = 'unlimited guesses';
@@ -163,6 +173,12 @@ function renderHeader() {
 }
 
 function renderAll() {
+  if (mode === 'battle') {
+    renderHeader();
+    battle.show();
+    return;
+  }
+  battle.hide();
   const { state } = current();
   renderHeader();
   board.render(state);
@@ -175,6 +191,7 @@ function renderAll() {
 const ERRORS = { short: 'Not enough letters', invalid: 'Not in word list' };
 
 async function handleKey(key) {
+  if (mode === 'battle') return battle.handleKey(key);
   if (busy) return;
   const slot = current();
   const state = slot.state;
@@ -256,6 +273,7 @@ function finishGame(slot) {
 }
 
 function openResults() {
+  if (mode === 'battle') return battle.openSheet();
   results.open({ mode, state: current().state, stats, today: dayNumber() });
   updateSheetAccount();
 }
@@ -392,7 +410,7 @@ function applyAppearance() {
 }
 
 function openSettings() {
-  const slot = current();
+  const slot = slotFor(soloMode());
   const locked = slot.state.guesses.length > 0 && slot.state.status === 'playing';
   const hard = $('hard-toggle');
   hard.checked = locked ? slot.state.hard : settings.hard;
@@ -404,7 +422,7 @@ function openSettings() {
   document.querySelectorAll('[data-theme-choice]').forEach((b) => {
     b.setAttribute('aria-checked', String(b.dataset.themeChoice === settings.theme));
   });
-  $('seed-current').textContent = mode === 'daily'
+  $('seed-current').textContent = soloMode() === 'daily'
     ? `Pick a seed (0–${ANSWERS.length - 1}) to play a specific word in Random mode.`
     : `Current seed: ${slot.seed}. Enter another (0–${ANSWERS.length - 1}) to play a specific word.`;
   $('seed-input').placeholder = `0 – ${ANSWERS.length - 1}`;
@@ -415,7 +433,7 @@ function openSettings() {
 $('hard-toggle').addEventListener('change', (e) => {
   settings.hard = e.target.checked;
   touchSettings();
-  const slot = current();
+  const slot = slotFor(soloMode());
   if (slot.state.guesses.length === 0) slot.state = { ...slot.state, hard: settings.hard };
   saveGames();
 });
@@ -443,17 +461,25 @@ $('seed-form').addEventListener('submit', (e) => {
     return;
   }
   $('settings-dialog').close();
-  setMode(mode === 'daily' ? 'random' : mode, { fresh: true, seed });
+  setMode(soloMode() === 'daily' ? 'random' : mode, { fresh: true, seed });
 });
 
 $('new-random-btn').addEventListener('click', () => {
   $('settings-dialog').close();
-  setMode(mode === 'daily' ? 'random' : mode, { fresh: true });
+  setMode(soloMode() === 'daily' ? 'random' : mode, { fresh: true });
 });
 
 // ---------- startup ----------
+let battleLink = null;
 function readUrlSeed() {
   const params = new URLSearchParams(location.search);
+  if (params.has('battle') && cloud.enabled) {
+    battleLink = params.get('battle');
+    mode = 'battle';
+    settings.mode = 'battle';
+    saveSettings();
+    return;
+  }
   if (!params.has('seed')) return;
   const seed = parseSeed(params.get('seed'), ANSWERS.length);
   const target = params.get('mode') === 'infini' ? 'infini' : 'random';
@@ -479,11 +505,12 @@ matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyAppe
 readUrlSeed();
 renderAll();
 cloud.start();
+if (battleLink) battle.openLink(battleLink);
 
 if (!load('seenHelp', false)) {
   save('seenHelp', true);
   $('help-dialog').showModal();
-} else if (current().state.status !== 'playing') {
+} else if (mode !== 'battle' && current().state.status !== 'playing') {
   // Returning to a finished game: show the results again.
   openResults();
 }

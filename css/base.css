@@ -1,5 +1,8 @@
 *, *::before, *::after { box-sizing: border-box; }
 
+/* `hidden` always wins over component display rules (the jump pill fades out instead). */
+[hidden]:not(.jump-pill) { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -93,6 +96,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .mode-menu [data-mode='daily'] .dot { --dot: var(--mode-daily); }
 .mode-menu [data-mode='random'] .dot { --dot: var(--mode-random); }
 .mode-menu [data-mode='infini'] .dot { --dot: var(--mode-infini); }
+.mode-menu [data-mode='battle'] .dot { --dot: var(--mode-battle); }
+.mode-menu button[hidden] { display: none; }
 
 /* ---------- Toasts ---------- */
 .toasts {
