@@ -7,9 +7,10 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['stats', 'settings', 'settingsAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['stats', 'settings', 'settingsAt', 'daily', 'updatedAt'])
         && (!('stats' in request.resource.data) || request.resource.data.stats is map)
-        && (!('settings' in request.resource.data) || request.resource.data.settings is map);
+        && (!('settings' in request.resource.data) || request.resource.data.settings is map)
+        && (!('daily' in request.resource.data) || request.resource.data.daily is map);
     }
     // Everything else is closed.
     match /{document=**} {

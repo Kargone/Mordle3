@@ -6,7 +6,7 @@
 // anonymous account (same uid), or, if the Google account is already used on
 // another device, switches to it and merges this device's stats in once.
 //
-// Firestore: users/{uid} = { stats, settings, settingsAt, updatedAt }
+// Firestore: users/{uid} = { stats, settings, settingsAt, daily, updatedAt }
 
 import { load, save } from './storage.js';
 import { emptyStats } from './stats.js';
@@ -23,7 +23,7 @@ const SDK = 'https://www.gstatic.com/firebasejs/11.0.2';
  * @param {object | null} config Firebase web config
  * @param {{
  *   getLocal: () => {stats: object, settings: object, settingsAt: number},
- *   onData: (data: {stats: object, settings?: object, settingsAt?: number}) => void,
+ *   onData: (data: {stats: object, settings?: object, settingsAt?: number, daily?: object}) => void,
  *   onSignedOut: () => void,
  *   onState: (state: CloudState) => void,
  * }} hooks
@@ -94,7 +94,7 @@ export function createCloud(config, hooks) {
           settings: useLocalSettings ? pickSyncedSettings(local.settings) : remote.settings,
           settingsAt: useLocalSettings ? (local.settingsAt ?? 0) : remote.settingsAt,
           updatedAt: fb.serverTimestamp(),
-        });
+        }, { merge: true }); // keep fields this merge doesn't touch, like daily
       });
       save('pending', pending().slice(merged)); // those games are now part of the merged stats
       save('syncUid', user.uid);
@@ -105,7 +105,7 @@ export function createCloud(config, hooks) {
       if (!snap.exists()) return;
       const d = snap.data();
       // Show cloud stats plus any games still waiting to upload.
-      hooks.onData({ stats: applyResults(d.stats ?? emptyStats(), pending()), settings: d.settings, settingsAt: d.settingsAt });
+      hooks.onData({ stats: applyResults(d.stats ?? emptyStats(), pending()), settings: d.settings, settingsAt: d.settingsAt, daily: d.daily });
     }, fail);
     await flush();
   }
@@ -140,6 +140,12 @@ export function createCloud(config, hooks) {
       save('pending', [...pending(), result]);
       emit({});
       flush();
+    },
+
+    /** Save today's daily progress ({day, seed, guesses, hard}). */
+    pushDaily(daily) {
+      if (!ref) return;
+      fb.setDoc(ref, { daily }, { merge: true }).catch((err) => console.warn('Daily sync failed:', err?.code ?? err));
     },
 
     pushSettings(settings, settingsAt) {

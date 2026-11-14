@@ -1,6 +1,7 @@
 // Merge rules for syncing between devices. Pure functions, no Firebase code.
 
 import { emptyBucket, emptyStats, recordGame } from './stats.js';
+import { evaluateGuess, MAX_GUESSES } from './game.js';
 
 /** Settings that follow you between devices. Mode is per-device. */
 export const SYNCED_SETTINGS = ['hard', 'theme', 'contrast'];
@@ -68,4 +69,45 @@ export function applyResults(stats, results) {
 export function newerSettings(local, localAt, remote, remoteAt) {
   if (!remote || !(remoteAt > (localAt ?? 0))) return null;
   return { ...local, ...pickSyncedSettings(remote) };
+}
+
+// ---------- in-progress daily ----------
+// Stored as { day, seed, guesses, hard }. Firestore can't hold nested arrays,
+// so colors are recomputed from the guesses. Typed-but-unsubmitted letters stay local.
+
+export function encodeDaily(slot) {
+  return { day: slot.day, seed: slot.seed, guesses: [...slot.state.guesses], hard: !!slot.state.hard };
+}
+
+/** Rebuild a daily slot from cloud data, or null if it doesn't fit today's word. */
+export function decodeDaily(data, answers, today) {
+  if (!data || data.day !== today || !Array.isArray(data.guesses)) return null;
+  const answer = answers[data.seed];
+  if (!answer || data.guesses.length > MAX_GUESSES) return null;
+  if (!data.guesses.every((g) => typeof g === 'string' && /^[a-z]{5}$/.test(g))) return null;
+  const won = data.guesses.at(-1) === answer;
+  if (data.guesses.slice(0, -1).includes(answer)) return null; // can't keep guessing after a win
+  const status = won ? 'won' : data.guesses.length >= MAX_GUESSES ? 'lost' : 'playing';
+  return {
+    day: data.day,
+    seed: data.seed,
+    recorded: status !== 'playing', // the device that finished it already counted it
+    state: {
+      answer, infinite: false, hard: !!data.hard, current: '', status,
+      guesses: [...data.guesses],
+      evaluations: data.guesses.map((g) => evaluateGuess(g, answer)),
+    },
+  };
+}
+
+/**
+ * Which copy of today's daily to keep: the one with more guesses.
+ * @returns {'remote' | 'local' | 'same'}
+ */
+export function pickDaily(localSlot, remoteSlot) {
+  const l = localSlot?.state.guesses.length ?? 0;
+  const r = remoteSlot?.state.guesses.length ?? 0;
+  if (remoteSlot && r > l) return 'remote';
+  if (localSlot && l > r) return 'local';
+  return 'same';
 }

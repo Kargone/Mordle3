@@ -5,7 +5,7 @@ import { createGame, addLetter, removeLetter, submitGuess, keyboardStates } from
 import { dayNumber, dailyAnswerIndex, parseSeed, randomSeed } from './daily.js';
 import { load, save } from './storage.js';
 import { emptyStats, recordGame, effectiveStreak } from './stats.js';
-import { newerSettings } from './sync.js';
+import { newerSettings, encodeDaily, decodeDaily, pickDaily } from './sync.js';
 import { createCloud } from './cloud.js';
 import { firebaseConfig } from './firebase-config.js';
 import { buildShareText } from './share.js';
@@ -87,6 +87,7 @@ const cloud = createCloud(firebaseConfig, {
       save('settingsAt', settingsAt);
       applyAppearance();
     }
+    syncDaily(data.daily);
   },
   onSignedOut() {
     stats = emptyStats();
@@ -112,6 +113,25 @@ const account = createAccountUI({
     toast('Signed out. Your stats are saved to your Google account.', 2600);
   },
 });
+
+/** Keep whichever copy of today's daily is further along. */
+let lastRemoteDaily = null;
+function syncDaily(remoteData = lastRemoteDaily) {
+  lastRemoteDaily = remoteData;
+  if (busy) return; // mid-reveal: checked again when it finishes
+  const today = dayNumber();
+  const local = games.daily?.day === today ? games.daily : null;
+  const remote = decodeDaily(remoteData, ANSWERS, today);
+  const pick = pickDaily(local, remote);
+  if (pick === 'local') cloud.pushDaily(encodeDaily(local));
+  if (pick !== 'remote') return;
+  games.daily = remote;
+  saveGames();
+  if (mode === 'daily') {
+    renderAll();
+    toast('Picked up your daily from another device', 2200);
+  }
+}
 
 /** A synced setting changed on this device. */
 function touchSettings() {
@@ -192,6 +212,7 @@ async function handleKey(key) {
   busy = true;
   slot.state = next;
   saveGames(); // persist before animating so a refresh can't lose the guess
+  if (mode === 'daily') cloud.pushDaily(encodeDaily(slot));
   board.render(next, { skipRow: row });
   await board.reveal(row, next.guesses[row], next.evaluations[row]);
   keyboard.update(keyboardStates(next));
@@ -201,6 +222,7 @@ async function handleKey(key) {
     board.render(next);
     board.scrollToBottom();
     busy = false;
+    syncDaily();
     return;
   }
 
@@ -213,6 +235,7 @@ async function handleKey(key) {
   }
   finishGame(slot);
   busy = false;
+  syncDaily();
   await wait(400);
   openResults();
 }

@@ -4,10 +4,11 @@
 
 - [ ] **Battle mode**: head-to-head races where two or more players get the same word. First to solve wins; ties go to fewer guesses.
 - [ ] **Firebase sync**
-  - [ ] **Set up the Firebase project** (see README → Sync): paste config into `js/firebase-config.js`, enable Anonymous + Google auth, add the Netlify domain, create Firestore, publish `firestore.rules`
-  - [x] Auth: anonymous sign-in, with optional Google sign-in to link devices (code done; needs the project above)
+  - [x] **Set up the Firebase project** (see README → Sync)
+  - [x] Auth: anonymous sign-in, with optional Google sign-in to link devices
   - [x] Sync stats, streaks and settings across devices (Firestore). Merge with existing localStorage data on first sign-in.
-  - [ ] Sync the in-progress game too, so a half-played daily continues on another device
+  - [x] Sync the in-progress daily, so a half-played daily continues on another device
+  - [ ] Re-publish `firestore.rules` whenever it changes (Firestore → Rules)
   - [ ] Real-time backend for battle mode: lobbies, presence, live opponent progress (Firestore listeners or Realtime Database)
   - [ ] Security rules so players can only write their own data; validate battle results on the server (Cloud Functions)
   - Note: `js/storage.js` and `js/stats.js` are kept separate so a Firebase-backed store can replace or wrap them.

@@ -48,9 +48,9 @@ Sync is off until `js/firebase-config.js` has a config. Without it the game work
 1. Create a Firebase project and add a **Web app**. Copy its `firebaseConfig` object into `js/firebase-config.js`. These values are public by design.
 2. **Authentication → Sign-in method:** enable **Anonymous** and **Google**.
 3. **Authentication → Settings → Authorized domains:** add your Netlify domain.
-4. **Firestore Database:** create a database (production mode), then paste `firestore.rules` into the **Rules** tab and publish.
+4. **Firestore Database:** create a database (production mode), then paste `firestore.rules` into the **Rules** tab and publish. Re-publish whenever `firestore.rules` changes.
 
-How it works: every player is signed in anonymously in the background and gets a `users/{uid}` document. Signing in with Google links that account. If the Google account already has stats from another device, this device's stats are merged in once (counts added, best streak kept, a daily played on both devices counted once). Finished games go into a small queue and are applied to the cloud stats in a transaction, so devices never overwrite each other and games played offline upload later. Settings (hard mode, theme, contrast) follow the most recent change. Signing out clears stats from this device; they stay in the Google account.
+How it works: every player is signed in anonymously in the background and gets a `users/{uid}` document. Signing in with Google links that account. If the Google account already has stats from another device, this device's stats are merged in once (counts added, best streak kept, a daily played on both devices counted once). Finished games go into a small queue and are applied to the cloud stats in a transaction, so devices never overwrite each other and games played offline upload later. Today's daily also syncs: submitted guesses are saved as you play, and whichever device is further along wins, so you can start on your phone and finish on your laptop. Settings (hard mode, theme, contrast) follow the most recent change. Signing out clears stats from this device; they stay in the Google account.
 
 ## Project layout
 

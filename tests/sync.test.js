@@ -79,3 +79,47 @@ test('settings: newer remote settings win, mode never syncs', () => {
   assert.deepEqual(pickSyncedSettings({ mode: 'random', hard: true, theme: 'system', contrast: true, updatedAt: 5 }),
     { hard: true, theme: 'system', contrast: true });
 });
+
+// ---------- in-progress daily ----------
+import { encodeDaily, decodeDaily, pickDaily } from '../js/sync.js';
+import { createGame, addLetter, submitGuess } from '../js/game.js';
+import { ANSWERS, VALID } from '../js/words.js';
+
+const HELLO = ANSWERS.indexOf('hello');
+function slotWith(guesses, day = 14) {
+  let state = createGame({ answer: 'hello' });
+  for (const g of guesses) state = submitGuess([...g].reduce(addLetter, state), VALID).state;
+  return { day, seed: HELLO, state, recorded: false };
+}
+
+test('daily round-trips through the cloud format', () => {
+  const slot = slotWith(['crane', 'llama']);
+  const data = encodeDaily(slot);
+  assert.deepEqual(data, { day: 14, seed: HELLO, guesses: ['crane', 'llama'], hard: false });
+  const back = decodeDaily(data, ANSWERS, 14);
+  assert.deepEqual(back.state.evaluations, slot.state.evaluations);
+  assert.equal(back.state.status, 'playing');
+  assert.equal(back.recorded, false);
+});
+
+test('decodeDaily: finished games, wrong day and bad data', () => {
+  const won = decodeDaily({ day: 14, seed: HELLO, guesses: ['crane', 'hello'] }, ANSWERS, 14);
+  assert.equal(won.state.status, 'won');
+  assert.equal(won.recorded, true);
+  const lost = decodeDaily({ day: 14, seed: HELLO, guesses: Array(6).fill('crane') }, ANSWERS, 14);
+  assert.equal(lost.state.status, 'lost');
+  assert.equal(decodeDaily({ day: 13, seed: HELLO, guesses: [] }, ANSWERS, 14), null, 'yesterday');
+  assert.equal(decodeDaily({ day: 14, seed: HELLO, guesses: ['NOPE!'] }, ANSWERS, 14), null);
+  assert.equal(decodeDaily({ day: 14, seed: HELLO, guesses: Array(7).fill('crane') }, ANSWERS, 14), null);
+  assert.equal(decodeDaily({ day: 14, seed: HELLO, guesses: ['hello', 'crane'] }, ANSWERS, 14), null);
+  assert.equal(decodeDaily(undefined, ANSWERS, 14), null);
+});
+
+test('pickDaily keeps the copy with more guesses', () => {
+  assert.equal(pickDaily(slotWith(['crane']), slotWith(['crane', 'llama'])), 'remote');
+  assert.equal(pickDaily(slotWith(['crane', 'llama']), slotWith(['crane'])), 'local');
+  assert.equal(pickDaily(slotWith(['crane']), slotWith(['slate'])), 'same');
+  assert.equal(pickDaily(slotWith(['crane']), null), 'local');
+  assert.equal(pickDaily(null, null), 'same');
+  assert.equal(pickDaily(slotWith([]), null), 'same');
+});
