@@ -84,6 +84,16 @@
     <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
     <h2 id="settings-title">Settings</h2>
 
+    <div class="account" id="account-row" hidden>
+      <div class="avatar" id="account-avatar" aria-hidden="true">?</div>
+      <div class="account-who">
+        <div class="setting-name" id="account-name">Not signed in</div>
+        <div class="sync-status" id="account-status"><i aria-hidden="true"></i><span>Not synced</span></div>
+      </div>
+      <button class="gbtn" type="button" id="signin-btn" data-icon="google">Sign in</button>
+      <button class="linkbtn" type="button" id="signout-btn" hidden>Sign out</button>
+    </div>
+
     <div class="setting">
       <div>
         <div class="setting-name">Hard mode</div>
@@ -138,6 +148,11 @@
       <h3 class="section-label" id="dist-label">Guess distribution</h3>
       <div class="dist" id="dist"></div>
     </div>
+    <div class="sync-nudge" id="sync-nudge" hidden>
+      <p id="nudge-text"><b id="nudge-title">Sync your stats</b>Sign in to keep them on your other devices.</p>
+      <button class="gbtn" type="button" id="nudge-signin" data-icon="google">Sign in</button>
+    </div>
+    <p class="sync-nudge synced" id="sync-done" hidden><span class="sync-status on"><i aria-hidden="true"></i><span>Synced to your Google account</span></span></p>
     <p class="infini-note" id="infini-note" hidden>InfiniMode games aren't counted in your stats.</p>
     <div class="sheet-actions">
       <button class="btn btn-primary" type="button" id="share-btn"><span data-icon="share"></span>Share</button>

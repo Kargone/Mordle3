@@ -2,7 +2,7 @@
 
 A five-letter word-guessing game with a daily puzzle, shareable random seeds, and an endless **InfiniMode**. It's a full rebuild of [Mordle-2](https://github.com/Kargone/Mordle-2) with modern code and a new look.
 
-Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies.**
+Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies.** Firebase loads from Google's CDN only when sync is configured.
 
 ## Features
 
@@ -14,6 +14,7 @@ Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies
 - **Share** your result as an emoji grid.
 - **Themes:** Dark and Light (or follow the system setting), plus a high-contrast option.
 - **Saving:** your game picks up where you left off after a refresh (saved in the browser).
+- **Sync (optional):** sign in with Google to keep stats, streaks and settings on every device (Firebase).
 - **Accessibility:** keyboard play, screen-reader labels, and reduced-motion support.
 
 ## Run locally
@@ -40,6 +41,17 @@ The tests cover scoring with repeated letters, hard-mode rules, the daily rollov
 
 **Netlify:** import the repo, leave the build command empty and set the publish directory to `.`.
 
+## Sync (Firebase)
+
+Sync is off until `js/firebase-config.js` has a config. Without it the game works exactly the same, saving to the browser only.
+
+1. Create a Firebase project and add a **Web app**. Copy its `firebaseConfig` object into `js/firebase-config.js`. These values are public by design.
+2. **Authentication → Sign-in method:** enable **Anonymous** and **Google**.
+3. **Authentication → Settings → Authorized domains:** add your Netlify domain.
+4. **Firestore Database:** create a database (production mode), then paste `firestore.rules` into the **Rules** tab and publish.
+
+How it works: every player is signed in anonymously in the background and gets a `users/{uid}` document. Signing in with Google links that account. If the Google account already has stats from another device, this device's stats are merged in once (counts added, best streak kept, a daily played on both devices counted once). Finished games go into a small queue and are applied to the cloud stats in a transaction, so devices never overwrite each other and games played offline upload later. Settings (hard mode, theme, contrast) follow the most recent change. Signing out clears stats from this device; they stay in the Google account.
+
 ## Project layout
 
 ```
@@ -50,10 +62,14 @@ js/daily.js         daily word and seed helpers
 js/stats.js         stats and streaks
 js/share.js         share text
 js/storage.js       localStorage wrapper
+js/sync.js          merge rules for syncing devices
+js/cloud.js         Firebase sign-in and Firestore sync
+js/firebase-config.js  Firebase config (null = sync off)
 js/words.js         answer and guess word lists
-js/ui/              board, keyboard, toasts, results sheet, icons, motion
+js/ui/              board, keyboard, toasts, results sheet, account, icons, motion
 js/main.js          wires everything together
 tests/              unit tests
 docs/               design decisions
+firestore.rules     Firestore security rules
 TODO.md             roadmap (battle mode, Firebase) and a manual test checklist
 ```

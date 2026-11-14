@@ -4,13 +4,17 @@ import { ANSWERS, VALID } from './words.js';
 import { createGame, addLetter, removeLetter, submitGuess, keyboardStates } from './game.js';
 import { dayNumber, dailyAnswerIndex, parseSeed, randomSeed } from './daily.js';
 import { load, save } from './storage.js';
-import { emptyStats, recordGame } from './stats.js';
+import { emptyStats, recordGame, effectiveStreak } from './stats.js';
+import { newerSettings } from './sync.js';
+import { createCloud } from './cloud.js';
+import { firebaseConfig } from './firebase-config.js';
 import { buildShareText } from './share.js';
 import { applyIcons } from './ui/icons.js';
 import { createBoard, createTile } from './ui/board.js';
 import { createKeyboard } from './ui/keyboard.js';
 import { createToaster } from './ui/toast.js';
 import { createResultsSheet, praiseFor } from './ui/results.js';
+import { createAccountUI } from './ui/account.js';
 import { wait } from './ui/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -22,6 +26,7 @@ const settings = { mode: 'daily', hard: false, theme: 'system', contrast: false,
 let stats = { ...emptyStats(), ...load('stats', {}) };
 const games = load('games', {}); // { daily: {day, seed, state}, random: {seed, state, recorded}, infini: {seed, state} }
 
+let settingsAt = load('settingsAt', 0); // when synced settings last changed on this device
 const saveSettings = () => save('settings', settings);
 const saveGames = () => save('games', games);
 
@@ -64,6 +69,57 @@ const board = createBoard($('board'), $('board-area'), $('jump-pill'));
 const keyboard = createKeyboard($('keyboard'), handleKey);
 const toast = createToaster($('toasts'));
 const results = createResultsSheet();
+
+// ---------- sync ----------
+const cloud = createCloud(firebaseConfig, {
+  getLocal: () => ({ stats, settings, settingsAt }),
+  onData(data) {
+    if (JSON.stringify(data.stats) !== JSON.stringify(stats)) {
+      stats = { ...emptyStats(), ...data.stats };
+      save('stats', stats);
+      if (results.isOpen) openResults();
+    }
+    const next = newerSettings(settings, settingsAt, data.settings, data.settingsAt);
+    if (next) {
+      Object.assign(settings, next);
+      settingsAt = data.settingsAt;
+      saveSettings();
+      save('settingsAt', settingsAt);
+      applyAppearance();
+    }
+  },
+  onSignedOut() {
+    stats = emptyStats();
+    save('stats', stats);
+  },
+  onState(state) {
+    account.update(state);
+    if (results.isOpen) updateSheetAccount();
+  },
+});
+
+const account = createAccountUI({
+  async onSignIn() {
+    try {
+      await cloud.signInWithGoogle();
+    } catch (err) {
+      console.warn(err);
+      toast("Couldn't sign in. Try again?");
+    }
+  },
+  async onSignOut() {
+    await cloud.signOut();
+    toast('Signed out. Your stats are saved to your Google account.', 2600);
+  },
+});
+
+/** A synced setting changed on this device. */
+function touchSettings() {
+  settingsAt = Date.now();
+  save('settingsAt', settingsAt);
+  saveSettings();
+  cloud.pushSettings(settings, settingsAt);
+}
 
 function announce(text) {
   $('announcer').textContent = text;
@@ -172,11 +228,18 @@ function finishGame(slot) {
   });
   slot.recorded = true;
   save('stats', stats);
+  cloud.record({ mode: mode === 'daily' ? 'daily' : 'random', won: state.status === 'won', guesses: state.guesses.length, day: slot.day });
   saveGames();
 }
 
 function openResults() {
   results.open({ mode, state: current().state, stats, today: dayNumber() });
+  updateSheetAccount();
+}
+
+function updateSheetAccount() {
+  const bucket = stats[mode === 'daily' ? 'daily' : 'random'];
+  account.updateSheet({ mode, played: bucket.played, streak: effectiveStreak(bucket, mode, dayNumber()) });
 }
 
 document.addEventListener('keydown', (e) => {
@@ -328,7 +391,7 @@ function openSettings() {
 
 $('hard-toggle').addEventListener('change', (e) => {
   settings.hard = e.target.checked;
-  saveSettings();
+  touchSettings();
   const slot = current();
   if (slot.state.guesses.length === 0) slot.state = { ...slot.state, hard: settings.hard };
   saveGames();
@@ -336,7 +399,7 @@ $('hard-toggle').addEventListener('change', (e) => {
 
 $('contrast-toggle').addEventListener('change', (e) => {
   settings.contrast = e.target.checked;
-  saveSettings();
+  touchSettings();
   applyAppearance();
 });
 
@@ -344,7 +407,7 @@ $('theme-seg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-theme-choice]');
   if (!b) return;
   settings.theme = b.dataset.themeChoice;
-  saveSettings();
+  touchSettings();
   applyAppearance();
   document.querySelectorAll('[data-theme-choice]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
 });
@@ -392,6 +455,7 @@ applyAppearance();
 matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyAppearance);
 readUrlSeed();
 renderAll();
+cloud.start();
 
 if (!load('seenHelp', false)) {
   save('seenHelp', true);

@@ -11,6 +11,7 @@ export function emptyBucket() {
     maxStreak: 0,
     distribution: Array(MAX_GUESSES).fill(0), // index = guesses - 1
     lastDay: null, // daily bucket only: puzzle number of the last recorded game
+    lastGuesses: 0, // daily bucket only: guesses in that game if won, 0 if lost (used when merging devices)
   };
 }
 
@@ -39,7 +40,10 @@ export function recordGame(stats, { mode, won, guesses, day }) {
   } else {
     b.currentStreak = 0;
   }
-  if (mode === 'daily') b.lastDay = day;
+  if (mode === 'daily') {
+    b.lastDay = day;
+    b.lastGuesses = won ? guesses : 0;
+  }
   return { ...stats, [mode]: b };
 }
 
