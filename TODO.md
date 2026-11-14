@@ -14,16 +14,17 @@
 
 ## Checklist: things to check by hand
 
-- [ ] Win, loss, invalid word, too-short guess
-- [ ] Duplicate-letter coloring is correct (e.g. guess LLAMA when the answer is HELLO)
-- [ ] Hard mode blocks bad guesses and can't be turned on after the first guess
-- [ ] Daily word changes at local midnight; the countdown is right
-- [ ] Refreshing mid-game resumes it
-- [ ] Custom seed and New Game work; InfiniMode scrolls past 6 rows
-- [ ] Stats and streaks update correctly; share text pastes nicely in Discord/iMessage
-- [ ] Light, dark and high-contrast themes all look right
-- [ ] Works on your phone (iOS Safari and Android Chrome) and on desktop
-- [ ] Physical keyboard and on-screen keyboard both work
-- [ ] The reduced-motion setting turns off animations
-- [ ] Help dialog shows on the first visit only
+- [x] Win, loss, invalid word, too-short guess
+- [x] Duplicate-letter coloring is correct (e.g. guess LLAMA when the answer is HELLO)
+- [x] Hard mode blocks bad guesses and can't be turned on after the first guess
+- [x] Daily word changes at local midnight; the countdown is right
+- [x] Refreshing mid-game resumes it
+- [x] Custom seed and New Game work; InfiniMode scrolls past 6 rows
+- [x] Stats and streaks update correctly
+- [ ] Share text pastes nicely in Discord/iMessage (needs a real paste)
+- [x] Light, dark and high-contrast themes all look right
+- [ ] Works on your phone: iOS Safari and Android Chrome (needs a real device). Desktop checked.
+- [x] Physical keyboard and on-screen keyboard both work
+- [x] The reduced-motion setting turns off animations
+- [x] Help dialog shows on the first visit only
 - [ ] Deployed site on Vercel/Netlify loads with no console errors
