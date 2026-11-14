@@ -94,7 +94,11 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader }) {
     }
   }
 
-  function onRoom(next) {
+  function onRoom(next, fromCache = false) {
+    // A cached or out-of-order copy can be older than what we already have
+    // (for example from before we joined). Wait for the server's copy.
+    if (fromCache && (!next || !next.players[me()])) return;
+    if (next && room && next.code === room.code && next.updatedAt < room.updatedAt) return;
     if (!next) return exitRoom('The room was closed');
     if (!next.players[me()]) return exitRoom('You left the room');
     const prev = room;
@@ -239,10 +243,9 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader }) {
     await run(api.start(code, randomSeed(ANSWERS.length)));
   }
 
-  function changeSetting(key, step) {
+  function changeSetting(key, stepOrValue) {
     if (!room) return;
-    const patch = key in LIMITS ? { [key]: room.settings[key] + step * LIMITS[key].step } : { [key]: step };
-    run(api.settings(code, patch));
+    run(api.settings(code, key, key in LIMITS ? { step: stepOrValue } : { value: stepOrValue }));
   }
 
   async function submit() {

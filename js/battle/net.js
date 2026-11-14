@@ -13,8 +13,17 @@ export function createRoomsApi(session) {
   const { fb, db, uid } = session;
   const roomRef = (code) => fb.doc(db, 'rooms', code);
 
+  // This player's changes run one at a time, so quick taps don't collide with each other.
+  let queue = Promise.resolve();
+  function mutate(code, change) {
+    const run = () => transact(code, change);
+    const result = queue.then(run, run);
+    queue = result.catch(() => {});
+    return result;
+  }
+
   /** Run `change(room)` in a transaction. It returns the new room, null for "no change", or {error}. */
-  async function mutate(code, change) {
+  async function transact(code, change) {
     return fb.runTransaction(db, async (tx) => {
       const snap = await tx.get(roomRef(code));
       if (!snap.exists()) return { error: 'gone' };
@@ -48,7 +57,11 @@ export function createRoomsApi(session) {
 
     join: (code, name) => mutate(code, (room, now) => L.joinRoom(room, { uid, name, now })),
     leave: (code) => mutate(code, (room, now) => L.leaveRoom(room, { uid, now })),
-    settings: (code, patch) => mutate(code, (room, now) => L.updateSettings(room, { uid, patch, now })),
+    /** step: +1/-1 for a stepper (applied to the latest value, so quick taps all count); else value. */
+    settings: (code, key, { step, value }) => mutate(code, (room, now) => {
+      const patch = step != null ? { [key]: room.settings[key] + step * L.LIMITS[key].step } : { [key]: value };
+      return L.updateSettings(room, { uid, patch, now });
+    }),
     start: (code, seed) => mutate(code, (room, now) => L.startRound(room, { uid, seed, now })),
     guess: (code, word, turnId, answers, valid) =>
       mutate(code, (room, now) => L.applyGuess(room, { uid, word, turnId, answers, valid, now })),
@@ -62,7 +75,8 @@ export function createRoomsApi(session) {
     },
 
     watch(code, onRoom, onError) {
-      return fb.onSnapshot(roomRef(code), (snap) => onRoom(snap.exists() ? snap.data() : null), onError);
+      // fromCache: the SDK may first replay an older cached copy (e.g. from the lobby list).
+      return fb.onSnapshot(roomRef(code), (snap) => onRoom(snap.exists() ? snap.data() : null, !!snap.metadata?.fromCache), onError);
     },
 
     /** Live list of public rooms waiting for players. */
