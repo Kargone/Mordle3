@@ -31,8 +31,29 @@ export function createTile(letter = '', state = 'empty') {
   return tile;
 }
 
-export function createBoard(boardEl, areaEl) {
+export function createBoard(boardEl, areaEl, pillEl) {
   const rows = [];
+
+  // Jump pill: shows how many rows are scrolled out of view above; tap to go to the top.
+  function updatePill() {
+    if (!pillEl) return;
+    const step = rows[0] ? rows[0].offsetHeight + parseFloat(getComputedStyle(boardEl).rowGap || 0) : 0;
+    const above = areaEl.classList.contains('scrolling') && step ? Math.round(areaEl.scrollTop / step) : 0;
+    pillEl.hidden = above < 1;
+    if (above >= 1) {
+      const text = `${above} earlier row${above === 1 ? '' : 's'}`;
+      pillEl.textContent = `↑ ${text}`;
+      pillEl.setAttribute('aria-label', `${text}. Scroll to top`);
+    }
+  }
+  if (pillEl) {
+    areaEl.addEventListener('scroll', updatePill, { passive: true });
+    window.addEventListener('resize', updatePill);
+    pillEl.addEventListener('click', () => {
+      areaEl.scrollTo({ top: 0, behavior: reducedMotion() ? 'instant' : 'smooth' });
+      pillEl.blur();
+    });
+  }
 
   function ensureRows(count) {
     while (rows.length < count) {
@@ -57,6 +78,8 @@ export function createBoard(boardEl, areaEl) {
     const count = state.infinite ? Math.max(MAX_GUESSES, state.guesses.length + active) : MAX_GUESSES;
     ensureRows(count);
     areaEl.classList.toggle('scrolling', count > MAX_GUESSES);
+    if (count <= MAX_GUESSES) areaEl.scrollTop = 0;
+    updatePill();
 
     rows.forEach((row, r) => {
       const submitted = r < state.guesses.length;
@@ -107,10 +130,11 @@ export function createBoard(boardEl, areaEl) {
     await wait((WORD_LENGTH - 1) * WIN_STAGGER + WIN_MS);
   }
 
-  function scrollToRow(row) {
+  // InfiniMode: the active (or final) row is always the last one, so scroll all the way down.
+  function scrollToBottom() {
     if (!areaEl.classList.contains('scrolling')) return;
-    rows[Math.min(row, rows.length - 1)]?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+    areaEl.scrollTo({ top: areaEl.scrollHeight, behavior: reducedMotion() ? 'instant' : 'smooth' });
   }
 
-  return { render, pop, shake, reveal, win, scrollToRow };
+  return { render, pop, shake, reveal, win, scrollToBottom };
 }

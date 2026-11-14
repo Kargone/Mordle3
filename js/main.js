@@ -60,7 +60,7 @@ const current = () => slotFor(mode);
 
 // ---------- UI ----------
 applyIcons();
-const board = createBoard($('board'), $('board-area'));
+const board = createBoard($('board'), $('board-area'), $('jump-pill'));
 const keyboard = createKeyboard($('keyboard'), handleKey);
 const toast = createToaster($('toasts'));
 const results = createResultsSheet();
@@ -91,7 +91,7 @@ function renderAll() {
   renderHeader();
   board.render(state);
   keyboard.update(keyboardStates(state));
-  board.scrollToRow(state.guesses.length);
+  board.scrollToBottom();
   saveGames();
 }
 
@@ -143,7 +143,7 @@ async function handleKey(key) {
 
   if (next.status === 'playing') {
     board.render(next);
-    board.scrollToRow(row + 1);
+    board.scrollToBottom();
     busy = false;
     return;
   }

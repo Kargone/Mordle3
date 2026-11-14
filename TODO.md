@@ -9,6 +9,8 @@
   - [ ] Real-time backend for battle mode: lobbies, presence, live opponent progress (Firestore listeners or Realtime Database)
   - [ ] Security rules so players can only write their own data; validate battle results on the server (Cloud Functions)
   - Note: `js/storage.js` and `js/stats.js` are kept separate so a Firebase-backed store can replace or wrap them.
+- [x] Scroll bar UI revamp: hidden bar + "↑ N earlier rows" jump pill
+- [x] InfiniMode scrolls to the very bottom
 
 ## Checklist: things to check by hand
 
