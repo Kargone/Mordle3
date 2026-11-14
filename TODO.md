@@ -21,10 +21,10 @@
 - [x] Refreshing mid-game resumes it
 - [x] Custom seed and New Game work; InfiniMode scrolls past 6 rows
 - [x] Stats and streaks update correctly
-- [ ] Share text pastes nicely in Discord/iMessage (needs a real paste)
+- [x] Share text pastes nicely in Discord/iMessage
 - [x] Light, dark and high-contrast themes all look right
-- [ ] Works on your phone: iOS Safari and Android Chrome (needs a real device). Desktop checked.
+- [x] Works on your phone (iOS Safari and Android Chrome) and on desktop
 - [x] Physical keyboard and on-screen keyboard both work
 - [x] The reduced-motion setting turns off animations
 - [x] Help dialog shows on the first visit only
-- [ ] Deployed site on Vercel/Netlify loads with no console errors
+- [x] Deployed site on Netlify loads with no console errors
