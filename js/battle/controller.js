@@ -59,6 +59,25 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     return api;
   }
 
+  // Signing in with Google (to an account used elsewhere) or signing out changes
+  // this device's uid. Rooms list players by uid, so rejoin as the new account
+  // and move the old seat over. Only possible in a lobby: the rules don't let a
+  // new account join a game in progress, so main.js asks the player to leave first.
+  cloud.onAccountSwitch(async (session, oldUid) => {
+    if (!api) return; // battle not used yet; connect() will pick up the new account
+    clearInterval(heartbeat); // a ping from the new uid before it joins would add a half-made player
+    watchLobby(false);
+    api = createRoomsApi(session);
+    if (!code) return render();
+    const c = code;
+    unwatchRoom?.();
+    unwatchRoom = null;
+    const joined = await run(api.join(c, playerName()));
+    if (!joined) return exitRoom();
+    const moved = await run(api.takeOver(c, oldUid));
+    enterRoom(c, moved?.room ?? joined.room);
+  });
+
   const statsDialog = $('bstats-dialog');
   statsDialog.addEventListener('click', (e) => { if (e.target === statsDialog) statsDialog.close(); });
   function openStats() {
@@ -84,7 +103,10 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
       unwatchRoom?.();
       code = nextCode;
       save('battleRoom', code);
-      unwatchRoom = api.watch(code, onRoom, (err) => console.warn('Room watch failed:', err?.code ?? err));
+      unwatchRoom = api.watch(code, onRoom, (err) => {
+        // An account switch ends this listener; onAccountSwitch starts a new one.
+        if (cloud.uid === me()) console.warn('Room watch failed:', err?.code ?? err);
+      });
       clearInterval(heartbeat);
       heartbeat = setInterval(beat, HEARTBEAT_MS);
     }
@@ -397,6 +419,8 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     },
 
     get inRoom() { return !!code; },
+    /** Signing in or out is fine unless a game is under way in this room (see onAccountSwitch). */
+    get canSwitchAccount() { return !code || !room || room.status === 'lobby'; },
     get presentCount() { return room ? presentPlayers(room, Date.now()).length : 0; },
   };
 }

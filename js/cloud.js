@@ -38,6 +38,8 @@ export function createCloud(config, hooks) {
   let flushing = null;
   let session = null; // { fb, db, uid, name } once signed in
   const waiters = [];
+  let lastUid = null; // to notice account switches
+  const switchListeners = [];
 
   const pending = () => load('pending', []);
   const emit = (patch) => {
@@ -105,6 +107,8 @@ export function createCloud(config, hooks) {
     emit(describe(user));
     session = { fb, db, uid: user.uid, name: user.displayName || '' };
     waiters.splice(0).forEach((resolve) => resolve(session));
+    if (lastUid && lastUid !== user.uid) switchListeners.forEach((fn) => fn(session, lastUid));
+    lastUid = user.uid;
     unsubscribe = fb.onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       const d = snap.data();
@@ -138,11 +142,18 @@ export function createCloud(config, hooks) {
     start,
     get state() { return state; },
     get enabled() { return !!config; },
+    /** The uid signed in right now (null between accounts). */
+    get uid() { return auth?.currentUser?.uid ?? null; },
 
     /** Firestore access for battle mode. Resolves once signed in (anonymously or with Google). */
     session() {
       if (session) return Promise.resolve(session);
       return new Promise((resolve) => waiters.push(resolve));
+    },
+
+    /** fn(newSession, oldUid) runs when this device switches accounts (Google sign-in to another uid, or sign-out). */
+    onAccountSwitch(fn) {
+      switchListeners.push(fn);
     },
 
     /** Call when a Daily or Random game finishes (after recording it locally). */

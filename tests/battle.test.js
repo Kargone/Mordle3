@@ -4,7 +4,7 @@ import { ANSWERS, VALID } from '../js/words.js';
 import {
   createRoom, joinRoom, leaveRoom, claimHost, updateSettings, startRound, applyGuess, skipTurn,
   nextTurnUid, guessError, sharedState, standings, matchWinners, listable, makeCode, normalizeCode,
-  cleanSettings, COLORS, AWAY_MS,
+  cleanSettings, COLORS, AWAY_MS, replacePlayer,
 } from '../js/battle/logic.js';
 
 const SEED = ANSWERS.indexOf('lemon');
@@ -268,4 +268,29 @@ test('co-op: no turns, anyone guesses, no repeats, unlimited guesses, team resul
   room = endMatch(room, { uid: 'mia', now: T });
   assert.equal(room.status, 'matchOver');
   assert.equal(room.solved, 2);
+});
+
+test('account switch: the new uid takes over the old seat', () => {
+  let room = createRoom({ code: 'ABCD', uid: 'old', name: 'Kar', now: T });
+  room = joinRoom(room, { uid: 'bob', name: 'Bob', now: T }).room;
+  room = joinRoom(room, { uid: 'new', name: 'Kar', now: T + 5 }).room;
+  const color = room.players.old.color;
+  const next = replacePlayer(room, { uid: 'new', oldUid: 'old', now: T + 6 });
+  assert.deepEqual(next.order, ['new', 'bob']);
+  assert.equal(next.hostUid, 'new');
+  assert.equal(next.players.new.color, color);
+  assert.equal(next.players.old, undefined);
+  assert.equal(Object.keys(next.players).length, 2);
+  assert.equal(replacePlayer(next, { uid: 'new', oldUid: 'old', now: T + 7 }), null, 'nothing left to move');
+});
+
+test('account switch mid-round keeps turn, guesses and score', () => {
+  let room = createRoom({ code: 'ABCD', uid: 'old', name: 'Kar', now: T });
+  room = joinRoom(room, { uid: 'bob', name: 'Bob', now: T }).room;
+  room = { ...startRound(room, { uid: 'old', seed: SEED, now: T }).room, guesses: [{ uid: 'old', word: 'crane' }] };
+  room = { ...room, players: { ...room.players, old: { ...room.players.old, score: 3 }, new: { name: 'Kar', color: '#000', score: 0, seen: T } }, order: [...room.order, 'new'], turn: { uid: 'old', id: 4 } };
+  const next = replacePlayer(room, { uid: 'new', oldUid: 'old', now: T + 1 });
+  assert.equal(next.turn.uid, 'new');
+  assert.equal(next.guesses[0].uid, 'new');
+  assert.equal(next.players.new.score, 3);
 });

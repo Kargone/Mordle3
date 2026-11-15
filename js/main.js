@@ -108,6 +108,7 @@ const cloud = createCloud(firebaseConfig, {
 
 const account = createAccountUI({
   async onSignIn() {
+    if (!battle.canSwitchAccount) return toast('Leave the Battle room first to sign in', 2400);
     try {
       await cloud.signInWithGoogle();
     } catch (err) {
@@ -116,6 +117,7 @@ const account = createAccountUI({
     }
   },
   async onSignOut() {
+    if (!battle.canSwitchAccount) return toast('Leave the Battle room first to sign out', 2400);
     await cloud.signOut();
     toast('Signed out. Your stats are saved to your Google account.', 2600);
   },

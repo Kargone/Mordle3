@@ -164,6 +164,30 @@ export function leaveRoom(room, { uid, now }) {
   return { room: next };
 }
 
+/**
+ * This device switched accounts (signed in with Google, or signed out) while in
+ * the room: `uid` (already joined) takes over `oldUid`'s seat — name, colour,
+ * score, turn position and host role — and the old entry goes. Null if there's
+ * nothing to move.
+ */
+export function replacePlayer(room, { uid, oldUid, now }) {
+  const old = room.players[oldUid];
+  if (!old || !room.players[uid] || uid === oldUid) return null;
+  const swap = (u) => (u === oldUid ? uid : u);
+  const players = { ...room.players, [uid]: { ...old, seen: now, away: false } };
+  delete players[oldUid];
+  return {
+    ...room,
+    players,
+    order: room.order.filter((u) => u !== uid).map(swap),
+    hostUid: swap(room.hostUid),
+    turn: room.turn ? { ...room.turn, uid: swap(room.turn.uid) } : room.turn,
+    winner: room.winner == null ? room.winner : swap(room.winner),
+    guesses: room.guesses.map((g) => (g.uid === oldUid ? { ...g, uid } : g)),
+    updatedAt: now,
+  };
+}
+
 /** If the host has gone quiet, the first present player takes over. */
 export function claimHost(room, { uid, now }) {
   if (isPresent(room, room.hostUid, now) || !isPresent(room, uid, now)) return null;
