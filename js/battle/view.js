@@ -4,16 +4,21 @@
 import { WORD_LENGTH } from '../game.js';
 import { createTile, setTile } from '../ui/board.js';
 import { reducedMotion, retrigger } from '../ui/motion.js';
-import { isPresent, isActive, presentPlayers, standings, matchWinners, atLimit, isUnlimited, LIMITS } from './logic.js';
+import { isPresent, isActive, presentPlayers, standings, matchWinners, atLimit, isUnlimited, isCoop, guessCounts, LIMITS } from './logic.js';
+import { formatTime } from '../clock.js';
+import { averageGuesses, emptyCoop } from '../stats.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initial = (name) => (name || '?').trim().charAt(0).toUpperCase() || '?';
-/** "3 rounds", "1 round", "∞ rounds". */
-export const roundsText = (room) => (isUnlimited(room) ? '∞ rounds'
-  : `${room.settings.rounds} round${room.settings.rounds === 1 ? '' : 's'}`);
-/** "round 2 of 3", or "round 2" when unlimited. */
-export const roundOf = (room) => `round ${room.round}${isUnlimited(room) ? '' : ` of ${room.settings.rounds}`}`;
+/** "3 rounds", "1 round", "∞ rounds" ("words" in co-op). */
+export function roundsText(room) {
+  const unit = isCoop(room) ? 'word' : 'round';
+  return isUnlimited(room) ? `∞ ${unit}s` : `${room.settings.rounds} ${unit}${room.settings.rounds === 1 ? '' : 's'}`;
+}
+/** "round 2 of 3", or "round 2" when unlimited ("word 2" in co-op). */
+export const roundOf = (room) => `${isCoop(room) ? 'word' : 'round'} ${room.round}${isUnlimited(room) ? '' : ` of ${room.settings.rounds}`}`;
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 'es'}`;
 const displayName = (room, uid, me) => (uid === me ? 'You' : room.players[uid]?.name ?? 'Player');
 
 function avatar(color, text, cls = 'av') {
@@ -53,7 +58,7 @@ export function renderLobby({ rooms, connecting, onJoin }) {
     const row = document.createElement('div');
     row.className = 'room-row';
     row.innerHTML = `<b>${esc(host)}'s room${room.settings.hard ? '<span class="badge">HARD</span>' : ''}</b>
-      <span class="meta">${room.order.length}/${room.settings.maxPlayers} players · ${room.settings.turnSecs}s turns · ${roundsText(room)}</span>`;
+      <span class="meta">${isCoop(room) ? '🤝 Co-op · ' : ''}${room.order.length}/${room.settings.maxPlayers} players${isCoop(room) ? '' : ` · ${room.settings.turnSecs}s turns`} · ${roundsText(room)}</span>`;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-secondary join';
@@ -98,6 +103,14 @@ export function renderRoom(room, me, now) {
     row.querySelector('[data-step="-1"]').disabled = !isHost || atLimit(key, v, -1) || (key === 'maxPlayers' && v <= room.order.length);
     row.querySelector('[data-step="1"]').disabled = !isHost || atLimit(key, v, 1);
   }
+  // Game: Battle or Co-op. Co-op has no turns, and rounds are words.
+  const coop = isCoop(room);
+  document.querySelectorAll('#room-game [data-game]').forEach((b) => {
+    b.setAttribute('aria-checked', String(b.dataset.game === room.settings.game));
+    b.disabled = !isHost;
+  });
+  document.querySelector('[data-setting="turnSecs"]').hidden = coop;
+  $('rounds-name').textContent = coop ? 'Words' : 'Rounds';
   $('room-hard').checked = room.settings.hard;
   $('room-public').checked = room.public;
   $('room-hard').disabled = !isHost;
@@ -122,6 +135,19 @@ export const roomUrl = (code) => `${location.origin}${location.pathname}?battle=
 export function createRaceView() {
   let renderedKey = '';
   let rendered = 0;
+
+  /** Co-op team strip: everyone, with how many guesses they've made this word. */
+  function renderTeam(room, me, now) {
+    const counts = guessCounts(room);
+    $('turn-strip').replaceChildren(...room.order.map((uid) => {
+      const p = room.players[uid];
+      const chip = document.createElement('div');
+      chip.className = 'pchip' + (isActive(room, uid, now) ? '' : ' away');
+      chip.appendChild(avatar(p.color, initial(p.name)));
+      chip.insertAdjacentHTML('beforeend', `<span class="nm">${esc(displayName(room, uid, me))}</span><span class="sc">${plural(counts[uid], 'guess')}</span>`);
+      return chip;
+    }));
+  }
 
   /** Turn strip: players in turn order starting with whoever's up. */
   function renderStrip(room, me, now) {
@@ -159,7 +185,11 @@ export function createRaceView() {
    * @param {{me: string, now: number, draft: string, evaluations: string[][]}} ctx
    */
   function render(room, { me, now, draft, evaluations }) {
-    renderStrip(room, me, now);
+    const coop = isCoop(room);
+    if (coop) renderTeam(room, me, now);
+    else renderStrip(room, me, now);
+    $('coop-counter').hidden = !coop;
+    if (coop) tickCoop(room, now);
     const key = `${room.code}:${room.round}`;
     const fresh = key !== renderedKey;
     if (fresh) { renderedKey = key; rendered = 0; }
@@ -176,7 +206,9 @@ export function createRaceView() {
     });
     rendered = room.guesses.length;
 
-    if (room.status === 'playing' && room.turn) {
+    if (room.status === 'playing' && coop && room.players[me]) {
+      rows.push(draftRow(room.players[me], draft, 'mine', 'you'));
+    } else if (room.status === 'playing' && room.turn) {
       const mine = room.turn.uid === me;
       const p = room.players[room.turn.uid];
       if (mine) {
@@ -220,11 +252,20 @@ export function createRaceView() {
     if (secs) secs.textContent = Math.max(0, Math.ceil(secsLeft));
   }
 
-  return { render, tick };
+  /** Co-op: "Guess 8 · 2:31" (the clock stops when the word is found). */
+  function tickCoop(room, now) {
+    const end = room.status === 'playing' ? now : room.endedAt ?? room.updatedAt;
+    const ms = Math.max(0, end - (room.startedAt ?? end));
+    const n = room.guesses.length + (room.status === 'playing' ? 1 : 0);
+    $('coop-counter').innerHTML = `Guess <b>${Math.max(1, n)}</b> · <b>${formatTime(ms)}</b>`;
+  }
+
+  return { render, tick, tickCoop };
 }
 
 // ---------- round over ----------
 export function renderRoundSheet(room, me, now, answer) {
+  if (isCoop(room)) return renderCoopSheet(room, me, now, answer);
   const over = room.status === 'matchOver';
   const winners = matchWinners(room);
   const w = room.winner ? room.players[room.winner] : null;
@@ -265,6 +306,51 @@ export function renderRoundSheet(room, me, now, answer) {
     : `Waiting for ${hostName} to ${over ? 'start a new match' : 'start the next round'}`;
 }
 
+/** Host buttons and waiting text under the co-op sheet. */
+function coopActions(room, me, now) {
+  const over = room.status === 'matchOver';
+  const isHost = room.hostUid === me;
+  const here = presentPlayers(room, now).length;
+  const btn = $('round-next');
+  btn.hidden = !isHost;
+  btn.textContent = over ? 'Play again' : 'Next word';
+  btn.disabled = here < 2;
+  $('round-end').hidden = !isHost || over || !isUnlimited(room);
+  const hostName = room.players[room.hostUid]?.name ?? 'the host';
+  $('round-wait').textContent = isHost
+    ? (here < 2 ? 'Everyone else has left.' : '')
+    : `Waiting for ${hostName} to ${over ? 'start a new match' : 'start the next word'}`;
+}
+
+/** Co-op sheet: the team found the word (or the match ended). */
+function renderCoopSheet(room, me, now, answer) {
+  const over = room.status === 'matchOver';
+  const finder = room.winner ? room.players[room.winner] : null;
+  const av = $('round-av');
+  av.style.background = finder ? finder.color : 'var(--raised)';
+  av.textContent = finder ? initial(finder.name) : '🤝';
+  const solved = room.solved ?? 0;
+  $('round-title').textContent = over ? 'Nice teamwork!' : finder ? 'Solved together!' : 'Round over';
+  $('round-answer').replaceChildren(...[...answer].map((l) => createTile(l, finder ? 'correct' : 'present')));
+  const ms = Math.max(0, (room.endedAt ?? room.updatedAt) - (room.startedAt ?? room.updatedAt));
+  const parts = [];
+  if (finder) parts.push(`${room.winner === me ? 'You' : finder.name} found it`, plural(room.guesses.length, 'guess'), formatTime(ms));
+  parts.push(over ? `${solved} word${solved === 1 ? '' : 's'} solved` : roundOf(room));
+  $('round-meta').textContent = parts.join(' · ');
+
+  const counts = guessCounts(room);
+  $('round-table').replaceChildren(...room.order.map((uid) => {
+    const p = room.players[uid];
+    const r = document.createElement('div');
+    r.className = 'score-row' + (uid === me ? ' me' : '');
+    r.innerHTML = `<i></i><span>${esc(uid === me ? `${p.name} (you)` : p.name)}${uid === room.winner ? ' 🎯' : ''}</span>`
+      + `<b>${counts[uid]} <small>${counts[uid] === 1 ? 'guess' : 'guesses'}</small></b>`;
+    r.firstChild.style.background = p.color;
+    return r;
+  }));
+  coopActions(room, me, now);
+}
+
 const DAY = 24 * 60 * 60 * 1000;
 
 /** "today", "yesterday", "3 days ago", "last week", "5 weeks ago", "2 months ago". */
@@ -279,12 +365,17 @@ export function playedAgo(at, now) {
 }
 
 /** Battle stats sheet: totals and the record against each rival. */
-export function renderBattleStats(battle, rivals, now) {
+export function renderBattleStats(battle, rivals, now, coop) {
   $('bst-played').textContent = battle.played;
   $('bst-win').textContent = battle.played ? Math.round((battle.wins / battle.played) * 100) : 0;
   $('bst-rounds').textContent = battle.roundsWon;
   $('bst-best').textContent = battle.maxStreak;
   $('bst-empty').hidden = rivals.length > 0;
+  const c = { ...emptyCoop(), ...coop };
+  $('cst-solved').textContent = c.solved;
+  $('cst-avg').textContent = c.solved ? averageGuesses(c).toFixed(1).replace(/\.0$/, '') : '–';
+  $('cst-fewest').textContent = c.fewest || '–';
+  $('cst-fastest').textContent = c.fastestMs ? formatTime(c.fastestMs) : '–';
   $('bst-rivals').replaceChildren(...rivals.map((r) => {
     const row = document.createElement('div');
     row.className = 'rival';

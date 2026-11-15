@@ -17,7 +17,7 @@ export function emptyBucket() {
 }
 
 export function emptyStats() {
-  return { daily: emptyBucket(), random: emptyBucket(), infini: emptyInfini(), battle: emptyBattle() };
+  return { daily: emptyBucket(), random: emptyBucket(), infini: emptyInfini(), battle: emptyBattle(), coop: emptyCoop() };
 }
 
 /** InfiniMode: words solved, total guesses (for the average), fewest guesses, fastest time (ms). */
@@ -38,6 +38,17 @@ function recordInfini(stats, { guesses, ms }) {
       fastestMs: lowest(prev.fastestMs, ms),
     },
   };
+}
+
+/** Co-op team record: same numbers as InfiniMode, plus the last word counted (so each is counted once). */
+export function emptyCoop() {
+  return { ...emptyInfini(), lastWord: null };
+}
+
+function recordCoop(stats, { word, guesses, ms }) {
+  const prev = { ...emptyCoop(), ...stats.coop };
+  if (prev.lastWord === word) return stats; // already counted
+  return { ...stats, coop: { ...recordInfini({ infini: prev }, { guesses, ms }).infini, lastWord: word } };
 }
 
 /** Which records a solved InfiniMode word beats: 'fewest', 'fastest' (none on the first word). */
@@ -126,6 +137,7 @@ function recordBattle(stats, { match, won, rounds, at, opponents }) {
 export function recordGame(stats, result) {
   if (result.mode === 'battle') return recordBattle(stats, result);
   if (result.mode === 'infini') return recordInfini(stats, result);
+  if (result.mode === 'coop') return recordCoop(stats, result);
   const { mode, won, guesses, day } = result;
   const prev = stats[mode] ?? emptyBucket();
   if (mode === 'daily' && prev.lastDay === day) return stats; // already counted today

@@ -8,6 +8,7 @@
   - [ ] Create the TTL policy in the console (README → Sync step 5)
   - [x] Battle stats: matches, win %, rounds won, best streak, and a record against each rival (stats button in Battle)
   - [x] Rounds default to ∞ (unlimited); the host ends the match from the round sheet
+  - [x] Co-op: a room setting; one shared board, anyone guesses any time, unlimited guesses, team record
   - [ ] Ideas: quick rematch with new players, emoji reactions
 - [ ] **Firebase sync**
   - [x] **Set up the Firebase project** (see README → Sync)

@@ -10,6 +10,7 @@ Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies
 - **Random:** a random word, or enter a seed (0–2308) to play a specific word. Share links include the seed (`?seed=1795`).
 - **InfiniMode:** unlimited guesses. The board scrolls as you go. A clock starts with your first letter (it pauses while the game is in the background), and stats track words solved, average and fewest guesses, and your fastest time.
 - **Battle (needs Firebase):** 2–8 players take turns on one shared board with a turn timer. Type your next guess while you wait. First to find the word wins the round. Share a room link or pick a room from the lobby.
+- **Co-op (a Battle room setting):** everyone on one team, one shared board. No turns: anyone can submit a guess at any time, guesses are unlimited, and the team record tracks words solved, guesses and time.
 - **Hard mode:** any letters you've found must be used in later guesses.
 - **Stats and streaks** for Daily and Random, with a guess-distribution chart.
 - **Share** your result as an emoji grid.
@@ -62,6 +63,7 @@ Rooms live in Firestore at `rooms/{code}` (4-character codes like `KQ7P`; links 
 - **Presence:** players who disconnect are skipped automatically. Switching away from the game or closing it marks you away at once, and your turns are skipped until you come back. A dropped connection is caught by heartbeats (every 10 seconds; quiet for 30 seconds = gone). If the host is gone, the next player becomes host; a host who only switched apps for a moment keeps the room.
 - **Cleanup:** every room write sets `expireAt` to 24 hours ahead (heartbeats too, so live rooms never expire). The TTL policy from setup step 5 deletes rooms past that time; Firestore usually does this within a day of expiry.
 - **Rounds:** 1–10 or ∞ (the default). An unlimited match goes on until the host taps **End match** on the round sheet.
+- **Co-op:** `settings.game = 'coop'`. No turn object; any player in the room can append a guess (a word already on the board is rejected, since teammates often send the same one at once). Each solved word is recorded once per player as a team result.
 - **Stats:** when a match ends, each player's device records it once (matches, outright wins, rounds won, win streak) plus a win–loss record against each opponent, keyed by their account so name changes don't split it. The 30 most recent rivals are kept. Battle stats sync with the rest of your stats.
 - **Trust:** there's no server checking guesses (that needs Cloud Functions on the Blaze plan). The rules keep strangers out of rooms and stop non-hosts changing settings, but players in a room could cheat. Fine for playing with friends.
 

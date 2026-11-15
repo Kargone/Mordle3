@@ -126,3 +126,14 @@
 .rival .rec .w { color: var(--accent-fg); }
 .rivals-empty { color: var(--text-dim); font-size: 14px; text-align: center; margin: 4px 0 8px; }
 #round-end { margin-right: 18px; }
+
+/* Co-op */
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 999px; padding: 3px; }
+.seg button { padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 800; color: var(--text-dim); }
+.seg button[aria-checked='true'] { background: var(--raised); color: var(--text); box-shadow: 0 2px 0 var(--raised-lip); }
+.seg button:disabled { cursor: default; }
+.seg button:disabled:not([aria-checked='true']) { opacity: .55; }
+.coop-counter { text-align: center; font-size: 12px; font-weight: 800; color: var(--text-dim); margin: 0 0 4px; font-variant-numeric: tabular-nums; }
+.coop-counter b { color: var(--text); }
+.score-row small { color: var(--text-dim); font-weight: 700; font-size: 12px; }
+#bstats-dialog .stats4 { margin-bottom: 8px; }

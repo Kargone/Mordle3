@@ -87,6 +87,7 @@ export function mergeStats(a = emptyStats(), b = emptyStats()) {
     daily: mergeBucket(a.daily, b.daily),
     random: mergeBucket(a.random, b.random),
     infini: mergeInfini(a.infini, b.infini),
+    coop: { ...mergeInfini(a.coop, b.coop), lastWord: a.coop?.lastWord ?? b.coop?.lastWord ?? null },
     battle: mergeBattle(a.battle, b.battle),
   };
 }

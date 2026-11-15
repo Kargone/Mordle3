@@ -53,13 +53,14 @@
       <!-- Battle: race screen -->
       <section class="battle-area" id="battle-area" hidden aria-label="Battle">
         <div class="turn-strip" id="turn-strip"></div>
+        <p class="coop-counter" id="coop-counter" hidden></p>
         <div class="battle-scroll" id="battle-scroll"><div class="battle-board" id="battle-board" aria-label="Shared board"></div></div>
       </section>
 
       <!-- Battle: lobby browser -->
       <section class="panel" id="battle-lobby" hidden aria-labelledby="battle-lobby-title">
         <h2 id="battle-lobby-title">Battle</h2>
-        <p class="panel-hint">Take turns on one shared board. First to find the word wins the round.</p>
+        <p class="panel-hint">Take turns on one shared board. First to find the word wins the round. Or switch your room to Co-op and solve together.</p>
         <label class="field"><span>Your name</span><input id="battle-name" maxlength="16" autocomplete="nickname" placeholder="Player"></label>
         <button class="btn btn-primary btn-block" type="button" id="battle-create">+ Create room</button>
         <form class="codebox" id="battle-join-form">
@@ -79,12 +80,19 @@
         </div>
         <div class="room-players" id="room-players"></div>
         <label class="field"><span>Your name</span><input id="room-name" maxlength="16" autocomplete="nickname" placeholder="Player"></label>
+        <div class="setting">
+          <div class="setting-name" id="game-label">Game</div>
+          <div class="seg" id="room-game" role="radiogroup" aria-labelledby="game-label">
+            <button type="button" role="radio" data-game="battle">⚔ Battle</button>
+            <button type="button" role="radio" data-game="coop">🤝 Co-op</button>
+          </div>
+        </div>
         <div class="setting" data-setting="turnSecs">
           <div class="setting-name">Turn timer</div>
           <div class="stepper"><button type="button" data-step="-1" aria-label="Less">−</button><span class="val"></span><button type="button" data-step="1" aria-label="More">+</button></div>
         </div>
         <div class="setting" data-setting="rounds">
-          <div class="setting-name">Rounds</div>
+          <div class="setting-name" id="rounds-name">Rounds</div>
           <div class="stepper"><button type="button" data-step="-1" aria-label="Less">−</button><span class="val"></span><button type="button" data-step="1" aria-label="More">+</button></div>
         </div>
         <div class="setting" data-setting="maxPlayers">
@@ -249,6 +257,13 @@
     <h3 class="section-label">Rivals</h3>
     <div class="rivals" id="bst-rivals"></div>
     <p class="rivals-empty" id="bst-empty">Finish a match to see your record against each player.</p>
+    <h3 class="section-label">Co-op</h3>
+    <div class="stats4">
+      <div><div class="num" id="cst-solved">0</div><div class="cap">Solved</div></div>
+      <div><div class="num" id="cst-avg">–</div><div class="cap">Avg guesses</div></div>
+      <div><div class="num" id="cst-fewest">–</div><div class="cap">Fewest</div></div>
+      <div><div class="num" id="cst-fastest">–</div><div class="cap">Fastest</div></div>
+    </div>
   </dialog>
 
   <script type="module" src="js/main.js"></script>

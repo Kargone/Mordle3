@@ -23,7 +23,7 @@ test('room codes and names', () => {
   assert.equal(normalizeCode(' kq7p '), 'KQ7P');
   assert.equal(normalizeCode('KQ0P'), null, 'no look-alike characters');
   assert.equal(normalizeCode('ABC'), null);
-  assert.deepEqual(cleanSettings({ turnSecs: 2, rounds: 99, maxPlayers: '4', hard: 1 }), { turnSecs: 5, rounds: 10, maxPlayers: 4, hard: true });
+  assert.deepEqual(cleanSettings({ turnSecs: 2, rounds: 99, maxPlayers: '4', hard: 1 }), { game: 'battle', turnSecs: 5, rounds: 10, maxPlayers: 4, hard: true });
 });
 
 test('joining: colors, max players, already started, rejoin', () => {
@@ -233,4 +233,39 @@ test('away players (app closed or in the background) are skipped; rejoining clea
   room = skipTurn(room, { turnId: room.turn.id, now: T });
   assert.equal(room.turn.uid, 'kai');
   assert.equal(joinRoom(room, { uid: 'you', name: 'you', now: T }).room.players.you.away, false);
+});
+
+test('co-op: no turns, anyone guesses, no repeats, unlimited guesses, team result', async () => {
+  const { coopResult, guessCounts, endMatch, isCoop, matchResult } = await import('../js/battle/logic.js');
+  let room = roomOf(['mia', 'you', 'kai']);
+  assert.equal(updateSettings(room, { uid: 'mia', patch: { game: 'chess' }, now: T }).settings.game, 'battle');
+  room = updateSettings(room, { uid: 'mia', patch: { game: 'coop' }, now: T });
+  assert.ok(isCoop(room));
+  room = startRound(room, { uid: 'mia', seed: SEED, now: T }).room;
+  assert.equal(room.turn, null);
+  assert.equal(room.startedAt, T);
+  const g = (r, uid, word, now = T) => applyGuess(r, { uid, word, turnId: null, ...ctx, now });
+  room = g(room, 'kai', 'crane').room;
+  room = g(room, 'kai', 'slate').room;
+  assert.equal(g(room, 'you', 'crane').error, 'repeat');
+  assert.equal(g(room, 'ben', 'thumb').error, 'turn', 'not in the room');
+  for (const w of ['thumb', 'pious', 'dough', 'fjord', 'world']) room = g(room, 'you', w).room;
+  assert.equal(room.status, 'playing', 'more than 6 guesses is fine');
+  assert.equal(coopResult(room, 'you'), null, 'not solved yet');
+  room = g(room, 'mia', 'lemon', T + 90_000).room;
+  assert.equal(room.status, 'roundOver');
+  assert.equal(room.winner, 'mia');
+  assert.equal(room.solved, 1);
+  assert.deepEqual(guessCounts(room), { mia: 1, you: 5, kai: 2 });
+  assert.deepEqual(coopResult(room, 'kai'), { mode: 'coop', word: `KQ7P-${SEED}-1`, guesses: 8, ms: 90_000 });
+  assert.equal(matchResult(room, 'kai'), null, "co-op doesn't count as a battle match");
+
+  room = startRound(room, { uid: 'mia', seed: SEED, now: T }).room;
+  assert.equal(room.round, 2);
+  room = leaveRoom(leaveRoom(room, { uid: 'kai', now: T }).room, { uid: 'you', now: T }).room;
+  assert.equal(room.status, 'playing', 'co-op can go on alone');
+  room = g(room, 'mia', 'lemon').room;
+  room = endMatch(room, { uid: 'mia', now: T });
+  assert.equal(room.status, 'matchOver');
+  assert.equal(room.solved, 2);
 });

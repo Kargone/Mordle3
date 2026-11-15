@@ -123,7 +123,7 @@ const account = createAccountUI({
 
 const battle = createBattle({
   cloud, keyboard, toast, announce, onHeader: renderHeader,
-  getStats: () => stats.battle,
+  getStats: () => ({ battle: stats.battle, coop: stats.coop }),
   onMatch(result) {
     const next = recordGame(stats, result);
     if (next === stats) return; // already counted

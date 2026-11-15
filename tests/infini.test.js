@@ -41,3 +41,14 @@ test('InfiniMode stats: solved, average, fewest, fastest, records, merge', () =>
   assert.deepEqual(mergeStats({ daily: s.daily, random: s.random }, other).infini, other.infini, 'old stats without infini');
   assert.equal(applyResults({}, [first]).infini.solved, 1, 'pending InfiniMode results apply to cloud stats');
 });
+
+test('co-op stats: each word counted once, merge', () => {
+  const r = (word, guesses, ms) => ({ mode: 'coop', word, guesses, ms });
+  let s = recordGame(emptyStats(), r('A', 8, 90_000));
+  assert.equal(recordGame(s, r('A', 8, 90_000)), s, 'same word again is ignored');
+  s = recordGame(s, r('B', 4, 120_000));
+  assert.deepEqual(s.coop, { solved: 2, guesses: 12, fewest: 4, fastestMs: 90_000, lastWord: 'B' });
+  assert.equal(s.infini.solved, 0);
+  const m = mergeStats(s, recordGame(emptyStats(), r('C', 3, 200_000))).coop;
+  assert.deepEqual([m.solved, m.fewest, m.fastestMs], [3, 3, 90_000]);
+});

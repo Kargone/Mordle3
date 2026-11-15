@@ -5,7 +5,7 @@ import { randomSeed } from '../daily.js';
 import { keyboardStates, WORD_LENGTH } from '../game.js';
 import { load, save } from '../storage.js';
 import { createRoomsApi, HEARTBEAT_MS } from './net.js';
-import { sharedState, guessError, presentPlayers, isPresent, normalizeCode, cleanName, matchResult, LIMITS } from './logic.js';
+import { sharedState, guessError, presentPlayers, isPresent, normalizeCode, cleanName, matchResult, coopResult, isCoop, LIMITS } from './logic.js';
 import { showPanel, renderLobby, renderRoom, createRaceView, renderRoundSheet, renderBattleStats, roomUrl, roundOf } from './view.js';
 import { emptyBattle, rivalList } from '../stats.js';
 
@@ -21,16 +21,17 @@ const ERRORS = {
   started: 'That game has already started',
   players: 'You need at least 2 players',
   host: 'Only the host can do that',
+  repeat: 'Already guessed',
 };
 
 /**
  * @param {{
  *   cloud: object, keyboard: object, toast: (msg: string, ms?: number) => void,
  *   announce: (text: string) => void, onHeader: () => void,
- *   onMatch: (result: object) => void, getStats: () => object,
+ *   onMatch: (result: object) => void, getStats: () => {battle: object, coop: object},
  * }} deps
- * onMatch gets this player's matchResult() each time a finished match is seen
- * (the stats code ignores repeats); getStats returns the battle stats bucket.
+ * onMatch gets this player's matchResult() / coopResult() each time a finished
+ * match or co-op word is seen (the stats code ignores repeats).
  */
 export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMatch, getStats }) {
   let api = null;
@@ -61,8 +62,9 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
   const statsDialog = $('bstats-dialog');
   statsDialog.addEventListener('click', (e) => { if (e.target === statsDialog) statsDialog.close(); });
   function openStats() {
-    const battle = { ...emptyBattle(), ...getStats() };
-    renderBattleStats(battle, rivalList(battle), Date.now());
+    const { battle: b, coop } = getStats();
+    const battle = { ...emptyBattle(), ...b };
+    renderBattleStats(battle, rivalList(battle), Date.now(), coop);
     if (!statsDialog.open) statsDialog.showModal();
   }
 
@@ -134,10 +136,8 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
       }
     }
     if (prev && prev.round !== room.round) draft = '';
-    if (room.status === 'matchOver') {
-      const result = matchResult(room, me());
-      if (result) onMatch(result);
-    }
+    const result = matchResult(room, me()) ?? coopResult(room, me());
+    if (result) onMatch(result);
     if (room.status === 'playing' && !ticker) ticker = setInterval(tick, 100);
     if (room.status !== 'playing') { clearInterval(ticker); ticker = null; }
 
@@ -151,6 +151,10 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
 
   // ---------- timer ----------
   function tick() {
+    if (room && room.status === 'playing' && isCoop(room)) {
+      if (active) race.tickCoop(room, Date.now());
+      return;
+    }
     if (!room || room.status !== 'playing' || !room.turn) return;
     const total = room.settings.turnSecs * 1000;
     const elapsed = performance.now() - turnSeen.at;
@@ -279,7 +283,7 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
 
   async function submit() {
     if (!room || room.status !== 'playing' || sending) return;
-    const mine = room.turn?.uid === me();
+    const mine = isCoop(room) || room.turn?.uid === me();
     if (draft.length < WORD_LENGTH) return toast(ERRORS.short);
     if (!VALID.has(draft)) return toast(ERRORS.invalid);
     if (!mine) return toast('Wait for your turn', 1000);
@@ -287,7 +291,7 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     if (err) return toast(ERRORS[err] ?? err, 1800);
     sending = true;
     const word = draft;
-    const res = await run(api.guess(code, word, room.turn.id, ANSWERS, VALID));
+    const res = await run(api.guess(code, word, room.turn?.id ?? null, ANSWERS, VALID));
     sending = false;
     if (res) draft = '';
     render();
@@ -318,6 +322,9 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
   });
   document.querySelectorAll('[data-setting] [data-step]').forEach((b) => b.addEventListener('click', () => {
     changeSetting(b.closest('[data-setting]').dataset.setting, Number(b.dataset.step));
+  }));
+  document.querySelectorAll('#room-game [data-game]').forEach((b) => b.addEventListener('click', () => {
+    if (room && room.settings.game !== b.dataset.game) changeSetting('game', b.dataset.game);
   }));
   $('room-hard').addEventListener('change', (e) => changeSetting('hard', e.target.checked));
   $('room-public').addEventListener('change', (e) => changeSetting('public', e.target.checked));
@@ -386,7 +393,7 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
       if (!room) return '⚔ Battle';
       if (room.status === 'lobby') return `⚔ Battle · ${room.code}`;
       const r = roundOf(room);
-      return `⚔ Battle · ${r[0].toUpperCase()}${r.slice(1)}`;
+      return `${isCoop(room) ? '🤝 Co-op' : '⚔ Battle'} · ${r[0].toUpperCase()}${r.slice(1)}`;
     },
 
     get inRoom() { return !!code; },

@@ -5,14 +5,18 @@
 // guess the word wins the round. A match is settings.rounds rounds
 // (0 = unlimited: it goes on until the host ends it).
 //
+// Co-op (settings.game = 'coop'): the same room, but everyone is on one team.
+// There are no turns: anyone can submit a guess at any time, guesses are
+// unlimited, and a round ends when the team finds the word.
+//
 // Room shape (one Firestore doc, rooms/{code}):
 // {
 //   code, hostUid, public, status: 'lobby' | 'playing' | 'roundOver' | 'matchOver',
 //   settings: { turnSecs, rounds, maxPlayers, hard },
 //   players: { [uid]: { name, color, score, seen, away } }, // seen = ms timestamp; away = app closed or in the background
 //   order: [uid, ...],                                    // join order
-//   round, seed, guesses: [{ uid, word }], turn: { uid, id } | null,
-//   winner, createdAt, updatedAt
+//   round, seed, guesses: [{ uid, word }], turn: { uid, id } | null (always null in co-op),
+//   winner, startedAt (this round), solved (co-op words found this match), createdAt, updatedAt
 // }
 
 import { evaluateGuess, hardModeViolation, WORD_LENGTH } from '../game.js';
@@ -23,7 +27,8 @@ export const LIMITS = {
   rounds: { min: 1, max: 10, step: 1 },
   maxPlayers: { min: 2, max: 8, step: 1 },
 };
-export const DEFAULT_SETTINGS = { turnSecs: 10, rounds: 0, maxPlayers: 8, hard: false };
+export const DEFAULT_SETTINGS = { game: 'battle', turnSecs: 10, rounds: 0, maxPlayers: 8, hard: false };
+export const GAMES = ['battle', 'coop'];
 export const UNLIMITED = 0; // settings.rounds value for "keep playing until the host ends the match"
 export const AWAY_MS = 30_000; // no heartbeat for this long = gone
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -45,6 +50,7 @@ const clamp = (n, { min, max }) => Math.min(max, Math.max(min, Math.round(Number
 
 export function cleanSettings(s = {}) {
   return {
+    game: GAMES.includes(s.game) ? s.game : DEFAULT_SETTINGS.game,
     turnSecs: clamp(s.turnSecs ?? DEFAULT_SETTINGS.turnSecs, LIMITS.turnSecs),
     rounds: Number(s.rounds ?? DEFAULT_SETTINGS.rounds) === UNLIMITED ? UNLIMITED : clamp(s.rounds, LIMITS.rounds),
     maxPlayers: clamp(s.maxPlayers ?? DEFAULT_SETTINGS.maxPlayers, LIMITS.maxPlayers),
@@ -71,6 +77,7 @@ export function atLimit(key, value, step) {
 }
 
 export const isUnlimited = (room) => room.settings.rounds === UNLIMITED;
+export const isCoop = (room) => room.settings.game === 'coop';
 
 export function isPresent(room, uid, now) {
   const p = room.players?.[uid];
@@ -150,7 +157,7 @@ export function leaveRoom(room, { uid, now }) {
     next.turn = { uid: nextTurnUid(room, uid, now), id: room.turn.id + 1 };
     if (next.turn.uid === uid) next.turn = { uid: order[0], id: room.turn.id + 1 };
   }
-  if (room.status === 'playing' && order.length === 1 && room.order.length > 1) {
+  if (room.status === 'playing' && order.length === 1 && room.order.length > 1 && !isCoop(room)) {
     // Everyone else left mid-round: nothing to race against, end the round.
     next = { ...next, status: 'roundOver', turn: null, winner: null };
   }
@@ -184,13 +191,17 @@ export function startRound(room, { uid, seed, now }) {
   // The first turn rotates each round so nobody always goes first.
   const preferred = room.order[(round - 1) % room.order.length];
   const first = isActive(room, preferred, now) ? preferred : nextTurnUid(room, preferred, now);
+  const turnId = (room.turnId ?? room.turn?.id ?? 0) + 1;
   return {
     room: {
       ...room, players, round, seed,
       status: 'playing',
       guesses: [],
       winner: null,
-      turn: { uid: first, id: (room.turn?.id ?? 0) + 1 },
+      turn: isCoop(room) ? null : { uid: first, id: turnId },
+      turnId, // keeps counting in co-op too, so turn ids never repeat after switching games
+      startedAt: now,
+      solved: newMatch ? 0 : room.solved ?? 0,
       updatedAt: now,
     },
   };
@@ -214,12 +225,15 @@ export function sharedState(room, answers) {
 
 /**
  * Check a guess before sending it (also run inside the transaction).
- * @returns {null | 'turn' | 'short' | 'invalid' | string} null if OK, else an error
+ * @returns {null | 'turn' | 'short' | 'invalid' | 'repeat' | string} null if OK, else an error
  */
 export function guessError(room, { uid, word, answers, valid }) {
-  if (room.status !== 'playing' || room.turn?.uid !== uid) return 'turn';
+  if (room.status !== 'playing' || !room.players[uid]) return 'turn';
+  if (!isCoop(room) && room.turn?.uid !== uid) return 'turn';
   if (word.length < WORD_LENGTH) return 'short';
   if (!valid.has(word)) return 'invalid';
+  // In co-op two teammates can easily send the same word at once.
+  if (isCoop(room) && room.guesses.some((g) => g.word === word)) return 'repeat';
   if (room.settings.hard) {
     const reason = hardModeViolation(sharedState(room, answers), word);
     if (reason) return reason;
@@ -228,14 +242,18 @@ export function guessError(room, { uid, word, answers, valid }) {
 }
 
 export function applyGuess(room, { uid, word, turnId, answers, valid, now }) {
-  if (room.turn?.id !== turnId) return { error: 'turn' };
+  if (!isCoop(room) && room.turn?.id !== turnId) return { error: 'turn' };
   const error = guessError(room, { uid, word, answers, valid });
   if (error) return { error };
   const guesses = [...room.guesses, { uid, word }];
+  const last = !isUnlimited(room) && room.round >= room.settings.rounds;
+  if (isCoop(room)) {
+    if (word !== answers[room.seed]) return { room: { ...room, guesses, updatedAt: now } };
+    return { room: { ...room, guesses, status: last ? 'matchOver' : 'roundOver', winner: uid, solved: (room.solved ?? 0) + 1, endedAt: now, updatedAt: now } };
+  }
   if (word === answers[room.seed]) {
     const players = { ...room.players, [uid]: { ...room.players[uid], score: room.players[uid].score + 1 } };
-    const status = !isUnlimited(room) && room.round >= room.settings.rounds ? 'matchOver' : 'roundOver';
-    return { room: { ...room, guesses, players, status, winner: uid, turn: null, updatedAt: now } };
+    return { room: { ...room, guesses, players, status: last ? 'matchOver' : 'roundOver', winner: uid, turn: null, updatedAt: now } };
   }
   return { room: { ...room, guesses, turn: { uid: nextTurnUid(room, uid, now), id: room.turn.id + 1 }, updatedAt: now } };
 }
@@ -271,7 +289,7 @@ export function listable(room, now) {
  * A win means the top score alone; a shared top score is a tie.
  */
 export function matchResult(room, uid) {
-  if (room.status !== 'matchOver' || !room.players[uid]) return null;
+  if (room.status !== 'matchOver' || !room.players[uid] || isCoop(room)) return null;
   const mine = room.players[uid].score;
   const winners = matchWinners(room);
   return {
@@ -285,4 +303,25 @@ export function matchResult(room, uid) {
       return { uid: u, name: p.name, color: p.color, result: Math.sign(mine - p.score) };
     }),
   };
+}
+
+/**
+ * A co-op word the team just found, for every teammate's stats. Null unless
+ * this round was a co-op win and `uid` is in the room.
+ */
+export function coopResult(room, uid) {
+  if (!isCoop(room) || !room.winner || !room.players[uid] || room.status === 'playing' || room.status === 'lobby') return null;
+  return {
+    mode: 'coop',
+    word: `${room.code}-${room.seed}-${room.round}`,
+    guesses: room.guesses.length,
+    ms: Math.max(0, (room.endedAt ?? room.updatedAt) - (room.startedAt ?? room.updatedAt)),
+  };
+}
+
+/** Guesses each player made this round (co-op team strip and solved sheet). */
+export function guessCounts(room) {
+  const counts = Object.fromEntries(room.order.map((u) => [u, 0]));
+  for (const g of room.guesses ?? []) if (g.uid in counts) counts[g.uid]++;
+  return counts;
 }
