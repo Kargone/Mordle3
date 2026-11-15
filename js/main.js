@@ -4,7 +4,8 @@ import { ANSWERS, VALID } from './words.js';
 import { createGame, addLetter, removeLetter, clearWord, submitGuess, keyboardStates } from './game.js';
 import { dayNumber, dailyAnswerIndex, parseSeed, randomSeed } from './daily.js';
 import { load, save } from './storage.js';
-import { emptyStats, recordGame, effectiveStreak } from './stats.js';
+import { emptyStats, recordGame, effectiveStreak, infiniRecords } from './stats.js';
+import { newClock, startClock, stopClock, clockMs, formatTime } from './clock.js';
 import { newerSettings, encodeDaily, decodeDaily, pickDaily } from './sync.js';
 import { createCloud } from './cloud.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -25,7 +26,9 @@ const MODES = ['daily', 'random', 'infini', 'battle'];
 // ---------- persisted state ----------
 const settings = { mode: 'daily', hard: false, theme: 'system', contrast: false, ...load('settings', {}) };
 let stats = { ...emptyStats(), ...load('stats', {}) };
-const games = load('games', {}); // { daily: {day, seed, state}, random: {seed, state, recorded}, infini: {seed, state} }
+const games = load('games', {}); // { daily: {day, seed, state}, random: {seed, state, recorded}, infini: {seed, state, clock} }
+// A clock left running when the page closed: that stretch isn't counted.
+if (games.infini?.clock) games.infini.clock.since = null;
 
 let settingsAt = load('settingsAt', 0); // when synced settings last changed on this device
 const saveSettings = () => save('settings', settings);
@@ -38,6 +41,7 @@ function newSlot(mode, seed) {
     recorded: false,
   };
   if (mode === 'daily') slot.day = dayNumber();
+  if (mode === 'infini') slot.clock = newClock();
   return slot;
 }
 
@@ -182,7 +186,44 @@ function renderHeader() {
   });
 }
 
+// ---------- InfiniMode clock ----------
+// Runs from the first letter typed until the word is solved, only while InfiniMode
+// is on screen and the page is visible.
+let clockTimer = null;
+const clockStarted = (slot) => slot.state.guesses.length > 0 || slot.state.current.length > 0 || slot.clock?.ms > 0;
+function syncClock() {
+  const slot = games.infini;
+  if (!slot) return;
+  slot.clock ??= newClock();
+  const s = slot.state;
+  const run = mode === 'infini' && !document.hidden && s.status === 'playing' && clockStarted(slot);
+  const now = Date.now();
+  const next = run ? startClock(slot.clock, now) : stopClock(slot.clock, now);
+  if (next !== slot.clock) { slot.clock = next; saveGames(); }
+  renderClock();
+  clearInterval(clockTimer);
+  let ticks = 0;
+  clockTimer = run ? setInterval(() => { renderClock(); if (++ticks % 5 === 0) bankClock(); }, 1000) : null;
+}
+/** Save the time so far (a running stretch is lost if the page closes without a pause). */
+function bankClock() {
+  const slot = games.infini;
+  if (slot?.clock?.since == null) return;
+  const now = Date.now();
+  slot.clock = startClock(stopClock(slot.clock, now), now);
+  saveGames();
+}
+window.addEventListener('pagehide', bankClock);
+function renderClock() {
+  const slot = games.infini;
+  const show = mode === 'infini' && !!slot?.clock && clockStarted(slot);
+  $('play-clock').hidden = !show;
+  if (show) $('play-clock-time').textContent = formatTime(clockMs(slot.clock, Date.now()));
+}
+document.addEventListener('visibilitychange', syncClock);
+
 function renderAll() {
+  syncClock();
   if (mode === 'battle') {
     renderHeader();
     battle.show();
@@ -223,6 +264,7 @@ async function handleKey(key) {
     slot.state = next;
     board.render(next);
     board.pop(next.guesses.length, next.current.length - 1);
+    if (mode === 'infini' && slot.clock?.since == null) syncClock(); // first letter starts the clock
     saveGames();
     return;
   }
@@ -238,6 +280,7 @@ async function handleKey(key) {
 
   busy = true;
   slot.state = next;
+  if (mode === 'infini') syncClock(); // stops on the answer
   saveGames(); // persist before animating so a refresh can't lose the guess
   if (mode === 'daily') cloud.pushDaily(encodeDaily(slot));
   board.render(next, { skipRow: row });
@@ -268,8 +311,19 @@ async function handleKey(key) {
 }
 
 function finishGame(slot) {
-  if (mode === 'infini' || slot.recorded) return;
+  if (slot.recorded) return;
   const { state } = slot;
+  if (mode === 'infini') {
+    if (state.status !== 'won') return;
+    const result = { mode: 'infini', guesses: state.guesses.length, ms: clockMs(slot.clock, Date.now()) };
+    slot.best = infiniRecords(stats.infini, result);
+    stats = recordGame(stats, result);
+    slot.recorded = true;
+    save('stats', stats);
+    cloud.record(result);
+    saveGames();
+    return;
+  }
   stats = recordGame(stats, {
     mode: mode === 'daily' ? 'daily' : 'random',
     won: state.status === 'won',
@@ -284,7 +338,7 @@ function finishGame(slot) {
 
 function openResults() {
   if (mode === 'battle') return battle.openSheet();
-  results.open({ mode, state: current().state, stats, today: dayNumber() });
+  results.open({ mode, state: current().state, stats, today: dayNumber(), slot: current() });
   updateSheetAccount();
 }
 

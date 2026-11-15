@@ -8,7 +8,7 @@ Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies
 
 - **Daily:** one word per day (changes at local midnight), the same for everyone.
 - **Random:** a random word, or enter a seed (0–2308) to play a specific word. Share links include the seed (`?seed=1795`).
-- **InfiniMode:** unlimited guesses. The board scrolls as you go.
+- **InfiniMode:** unlimited guesses. The board scrolls as you go. A clock starts with your first letter (it pauses while the game is in the background), and stats track words solved, average and fewest guesses, and your fastest time.
 - **Battle (needs Firebase):** 2–8 players take turns on one shared board with a turn timer. Type your next guess while you wait. First to find the word wins the round. Share a room link or pick a room from the lobby.
 - **Hard mode:** any letters you've found must be used in later guesses.
 - **Stats and streaks** for Daily and Random, with a guess-distribution chart.

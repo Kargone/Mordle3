@@ -1,7 +1,8 @@
 // Results / statistics bottom sheet.
 
 import { MAX_GUESSES } from '../game.js';
-import { effectiveStreak, winPercent } from '../stats.js';
+import { effectiveStreak, winPercent, averageGuesses, emptyInfini } from '../stats.js';
+import { clockMs, formatTime } from '../clock.js';
 import { msUntilNextDay } from '../daily.js';
 import { createTile } from './board.js';
 
@@ -31,9 +32,9 @@ export function createResultsSheet() {
   dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
 
   /**
-   * @param {{mode: string, state: object, stats: object, today: number}} ctx
+   * @param {{mode: string, state: object, stats: object, today: number, slot?: object}} ctx
    */
-  function open({ mode, state, stats, today }) {
+  function open({ mode, state, stats, today, slot }) {
     const over = state.status !== 'playing';
     const won = state.status === 'won';
     const infinite = mode === 'infini';
@@ -48,10 +49,29 @@ export function createResultsSheet() {
     const tiles = $('answer-tiles');
     tiles.replaceChildren(...[...state.answer].map((l) => createTile(l, won ? 'correct' : 'present')));
 
+    // InfiniMode: this word's guesses and time, and a badge for a new record
+    const line = $('result-line');
+    line.hidden = !(infinite && won);
+    if (infinite && won) {
+      const n = state.guesses.length;
+      const best = slot?.best ?? [];
+      const badge = best.length === 2 ? 'Fastest &amp; fewest yet' : best[0] === 'fastest' ? 'Fastest yet' : best[0] === 'fewest' ? 'Fewest guesses yet' : '';
+      line.innerHTML = `<b>${n}</b> guess${n === 1 ? '' : 'es'} · <b>${formatTime(clockMs(slot?.clock, Date.now()))}</b>`
+        + (badge ? `<span class="pb">${badge}</span>` : '');
+    }
+
     // stats
-    $('stats-body').hidden = infinite;
-    $('infini-note').hidden = !infinite;
-    if (!infinite) {
+    const caps = infinite ? ['Solved', 'Avg guesses', 'Fewest', 'Fastest'] : ['Played', 'Win %', 'Streak', 'Best'];
+    ['st-played', 'st-win', 'st-streak', 'st-best'].forEach((id, i) => { $(id).nextElementSibling.textContent = caps[i]; });
+    $('dist-label').hidden = infinite;
+    $('dist').hidden = infinite;
+    if (infinite) {
+      const b = { ...emptyInfini(), ...stats.infini };
+      $('st-played').textContent = b.solved;
+      $('st-win').textContent = b.solved ? averageGuesses(b).toFixed(1).replace(/\.0$/, '') : '–';
+      $('st-streak').textContent = b.fewest || '–';
+      $('st-best').textContent = b.fastestMs ? formatTime(b.fastestMs) : '–';
+    } else {
       const bucket = stats[mode];
       $('st-played').textContent = bucket.played;
       $('st-win').textContent = winPercent(bucket);

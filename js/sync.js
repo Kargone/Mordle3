@@ -1,6 +1,6 @@
 // Merge rules for syncing between devices. Pure functions, no Firebase code.
 
-import { emptyBucket, emptyBattle, emptyStats, recordGame, trimRivals } from './stats.js';
+import { emptyBucket, emptyBattle, emptyStats, recordGame, trimRivals, mergeInfini } from './stats.js';
 import { evaluateGuess, MAX_GUESSES } from './game.js';
 
 /** Settings that follow you between devices. Mode is per-device. */
@@ -86,6 +86,7 @@ export function mergeStats(a = emptyStats(), b = emptyStats()) {
   return {
     daily: mergeBucket(a.daily, b.daily),
     random: mergeBucket(a.random, b.random),
+    infini: mergeInfini(a.infini, b.infini),
     battle: mergeBattle(a.battle, b.battle),
   };
 }

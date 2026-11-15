@@ -1,5 +1,6 @@
 // Stats bookkeeping. Pure functions over a plain stats object.
-// Daily and random games keep separate buckets. InfiniMode games are not recorded.
+// Daily and random games keep separate buckets. InfiniMode records solved words,
+// guesses and play time; battle records matches (see recordBattle).
 
 import { MAX_GUESSES } from './game.js';
 
@@ -16,7 +17,48 @@ export function emptyBucket() {
 }
 
 export function emptyStats() {
-  return { daily: emptyBucket(), random: emptyBucket(), battle: emptyBattle() };
+  return { daily: emptyBucket(), random: emptyBucket(), infini: emptyInfini(), battle: emptyBattle() };
+}
+
+/** InfiniMode: words solved, total guesses (for the average), fewest guesses, fastest time (ms). */
+export function emptyInfini() {
+  return { solved: 0, guesses: 0, fewest: 0, fastestMs: 0 };
+}
+
+const lowest = (a, b) => (a && b ? Math.min(a, b) : a || b); // 0 = none yet
+
+function recordInfini(stats, { guesses, ms }) {
+  const prev = { ...emptyInfini(), ...stats.infini };
+  return {
+    ...stats,
+    infini: {
+      solved: prev.solved + 1,
+      guesses: prev.guesses + guesses,
+      fewest: lowest(prev.fewest, guesses),
+      fastestMs: lowest(prev.fastestMs, ms),
+    },
+  };
+}
+
+/** Which records a solved InfiniMode word beats: 'fewest', 'fastest' (none on the first word). */
+export function infiniRecords(infini, { guesses, ms }) {
+  const b = { ...emptyInfini(), ...infini };
+  if (!b.solved) return [];
+  return [guesses < b.fewest && 'fewest', ms < b.fastestMs && 'fastest'].filter(Boolean);
+}
+
+export const averageGuesses = (infini) => (infini?.solved ? infini.guesses / infini.solved : 0);
+
+/** Combine InfiniMode stats from two devices. */
+export function mergeInfini(a = emptyInfini(), b = emptyInfini()) {
+  a = { ...emptyInfini(), ...a };
+  b = { ...emptyInfini(), ...b };
+  return {
+    solved: a.solved + b.solved,
+    guesses: a.guesses + b.guesses,
+    fewest: lowest(a.fewest, b.fewest),
+    fastestMs: lowest(a.fastestMs, b.fastestMs),
+  };
 }
 
 export const MAX_RIVALS = 30;
@@ -83,6 +125,7 @@ function recordBattle(stats, { match, won, rounds, at, opponents }) {
  */
 export function recordGame(stats, result) {
   if (result.mode === 'battle') return recordBattle(stats, result);
+  if (result.mode === 'infini') return recordInfini(stats, result);
   const { mode, won, guesses, day } = result;
   const prev = stats[mode] ?? emptyBucket();
   if (mode === 'daily' && prev.lastDay === day) return stats; // already counted today

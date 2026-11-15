@@ -21,6 +21,8 @@
   - Note: `js/storage.js` and `js/stats.js` are kept separate so a Firebase-backed store can replace or wrap them.
 - [x] Scroll bar UI revamp: hidden bar + "↑ N earlier rows" jump pill
 - [x] InfiniMode scrolls to the very bottom
+- [x] InfiniMode time and guess stats, with a live clock
+- [x] Ctrl+Backspace / hold ⌫ clears the word
 
 ## Checklist: things to check by hand
 

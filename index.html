@@ -34,6 +34,7 @@
           <span id="mode-label">Daily</span>
           <span class="chev" data-icon="chevron" aria-hidden="true"></span>
         </button>
+        <span class="play-clock" id="play-clock" hidden><span aria-hidden="true">⏱</span> <span id="play-clock-time" role="timer" aria-label="Time">0:00</span></span>
         <div class="mode-menu" id="mode-menu" role="menu" hidden>
           <button type="button" role="menuitemradio" data-mode="daily"><span class="dot"></span><span class="name">Daily</span><span class="meta" data-meta="daily"></span></button>
           <button type="button" role="menuitemradio" data-mode="random"><span class="dot"></span><span class="name">Random</span><span class="meta" data-meta="random"></span></button>
@@ -194,6 +195,7 @@
     <div class="hero" id="result-hero">
       <h2 class="hero-title" id="stats-title">Statistics</h2>
       <div class="answer-tiles" id="answer-tiles"></div>
+      <p class="result-line" id="result-line" hidden></p>
     </div>
     <div id="stats-body">
       <div class="stats4">
@@ -210,7 +212,6 @@
       <button class="gbtn" type="button" id="nudge-signin" data-icon="google">Sign in</button>
     </div>
     <p class="sync-nudge synced" id="sync-done" hidden><span class="sync-status on"><i aria-hidden="true"></i><span>Synced to your Google account</span></span></p>
-    <p class="infini-note" id="infini-note" hidden>InfiniMode games aren't counted in your stats.</p>
     <div class="sheet-actions">
       <button class="btn btn-primary" type="button" id="share-btn"><span data-icon="share"></span>Share</button>
       <button class="btn btn-secondary" type="button" id="play-random-btn">Play Random</button>
