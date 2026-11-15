@@ -4,7 +4,7 @@ import { ANSWERS, VALID } from '../js/words.js';
 import {
   createRoom, joinRoom, leaveRoom, claimHost, updateSettings, startRound, applyGuess, skipTurn,
   nextTurnUid, guessError, sharedState, standings, matchWinners, listable, makeCode, normalizeCode,
-  cleanSettings, COLORS, AWAY_MS, replacePlayer,
+  cleanSettings, COLORS, AWAY_MS, replacePlayer, passTurn,
 } from '../js/battle/logic.js';
 
 const SEED = ANSWERS.indexOf('lemon');
@@ -293,4 +293,82 @@ test('account switch mid-round keeps turn, guesses and score', () => {
   assert.equal(next.turn.uid, 'new');
   assert.equal(next.guesses[0].uid, 'new');
   assert.equal(next.players.new.score, 3);
+});
+
+function three() {
+  let room = createRoom({ code: 'ABCD', uid: 'a', name: 'A', now: T });
+  room = joinRoom(room, { uid: 'b', name: 'B', now: T }).room;
+  room = joinRoom(room, { uid: 'c', name: 'C', now: T }).room;
+  return startRound(room, { uid: 'a', seed: SEED, now: T }).room; // a goes first
+}
+const timeout = (room) => skipTurn(room, { turnId: room.turn.id, now: T });
+const play = (room, word) => applyGuess(room, { uid: room.turn.uid, word, turnId: room.turn.id, ...ctx, now: T }).room;
+
+test('two timeouts in a row: that player sits out their next turn', () => {
+  let room = three();
+  room = timeout(room); // a misses (1)
+  assert.equal(room.turn.uid, 'b');
+  room = play(room, 'crane'); room = play(room, 'slate'); // b, c
+  assert.equal(room.turn.uid, 'a');
+  room = timeout(room); // a misses (2) -> sits out next time
+  assert.equal(room.players.a.sitOut, true);
+  room = play(room, 'pious'); // b
+  room = play(room, 'thumb'); // c -> a is passed over
+  assert.equal(room.turn.uid, 'b');
+  assert.deepEqual(room.turn.satOut, ['a']);
+  assert.equal(room.players.a.sitOut, false);
+  room = play(room, 'mound'); room = play(room, 'fight'); // b, c -> a is back
+  assert.equal(room.turn.uid, 'a');
+  assert.equal(room.turn.satOut, undefined);
+});
+
+test('a guess between timeouts resets the count', () => {
+  let room = three();
+  room = timeout(room); // a: 1
+  room = play(room, 'crane'); room = play(room, 'slate');
+  room = play(room, 'pious'); // a guesses: reset
+  assert.equal(room.players.a.misses, undefined);
+  room = play(room, 'thumb'); room = play(room, 'mound');
+  room = timeout(room); // a: 1 again
+  assert.equal(room.players.a.sitOut, undefined);
+  assert.equal(room.players.a.misses, 1);
+});
+
+test('skipping an away player does not count as a timeout', () => {
+  let room = three();
+  room = skipTurn(room, { turnId: room.turn.id, now: T, timedOut: false });
+  assert.equal(room.players.a.misses, undefined);
+});
+
+test('two players: the one sitting out is passed and the other goes again', () => {
+  let room = createRoom({ code: 'ABCD', uid: 'a', name: 'A', now: T });
+  room = joinRoom(room, { uid: 'b', name: 'B', now: T }).room;
+  room = startRound(room, { uid: 'a', seed: SEED, now: T }).room;
+  room = timeout(room); room = timeout(room); // a 1, b 1
+  room = timeout(room); // a 2 -> sits out
+  assert.equal(room.turn.uid, 'b');
+  room = play(room, 'crane'); // b guesses, a passed over -> b again
+  assert.equal(room.turn.uid, 'b');
+  assert.deepEqual(room.turn.satOut, ['a']);
+  room = play(room, 'slate');
+  assert.equal(room.turn.uid, 'a');
+});
+
+test('everyone else sitting out: the next of them plays anyway', () => {
+  let room = three();
+  room = { ...room, players: { ...room.players, b: { ...room.players.b, sitOut: true }, c: { ...room.players.c, sitOut: true } } };
+  room = { ...room, players: { ...room.players, a: { ...room.players.a, seen: T - AWAY_MS * 2 } } }; // a left
+  const { turn, players } = passTurn(room, 'a', T);
+  assert.equal(turn.uid, 'b');
+  assert.equal(players.b.sitOut, false);
+  assert.equal(players.c.sitOut, false);
+});
+
+test('timeouts and sit-outs reset with the next word', () => {
+  let room = three();
+  room = timeout(room);
+  room = { ...room, players: { ...room.players, b: { ...room.players.b, sitOut: true } }, status: 'roundOver' };
+  room = startRound(room, { uid: 'a', seed: SEED, now: T }).room;
+  assert.equal(room.players.a.misses, undefined);
+  assert.equal(room.players.b.sitOut, undefined);
 });

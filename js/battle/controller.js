@@ -5,7 +5,7 @@ import { randomSeed } from '../daily.js';
 import { keyboardStates, WORD_LENGTH } from '../game.js';
 import { load, save } from '../storage.js';
 import { createRoomsApi, HEARTBEAT_MS } from './net.js';
-import { sharedState, guessError, presentPlayers, isPresent, normalizeCode, cleanName, matchResult, coopResult, isCoop, LIMITS } from './logic.js';
+import { sharedState, guessError, presentPlayers, isPresent, normalizeCode, cleanName, matchResult, coopResult, isCoop, LIMITS, MISSES_TO_SIT_OUT } from './logic.js';
 import { showPanel, renderLobby, renderRoom, createRaceView, renderRoundSheet, renderBattleStats, roomUrl, roundOf } from './view.js';
 import { emptyBattle, rivalList } from '../stats.js';
 
@@ -150,8 +150,14 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     const prev = room;
     room = next;
 
+    if (prev && !prev.players[me()]?.sitOut && room.players[me()]?.sitOut && room.status === 'playing') {
+      toast(`${MISSES_TO_SIT_OUT} timeouts in a row: you sit out your next turn`, 2400);
+    }
     if (room.turn && room.turn.id !== turnSeen.id) {
       turnSeen = { id: room.turn.id, at: performance.now() };
+      for (const uid of room.turn.satOut ?? []) {
+        toast(uid === me() ? 'You sit out this turn' : `${room.players[uid]?.name ?? 'A player'} sits out this turn`, 1800);
+      }
       if (room.turn.uid === me() && room.status === 'playing') {
         toast('Your turn!', 1200);
         announce("Your turn. Type a word and press Enter.");
@@ -190,7 +196,7 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     if ((gone || elapsed >= total + (mine ? 0 : BACKUP_SKIP_MS)) && skippedId !== room.turn.id) {
       skippedId = room.turn.id;
       if (mine) toast("Time's up!", 1000);
-      api.skip(code, room.turn.id).catch((err) => console.warn('Skip failed:', err?.code ?? err));
+      api.skip(code, room.turn.id, !gone).catch((err) => console.warn('Skip failed:', err?.code ?? err));
     }
   }
 

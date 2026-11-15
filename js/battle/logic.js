@@ -144,6 +144,38 @@ export function nextTurnUid(room, uid, now) {
   return uid;
 }
 
+/** Timeouts in a row (in one word) that cost a player their next turn. */
+export const MISSES_TO_SIT_OUT = 2;
+
+/**
+ * Hand the turn on from `uid`. Players who earned a sit-out (see skipTurn) are
+ * passed over once and their flag cleared. Returns the new turn and players.
+ * `satOut` lists who was passed over, so every device can say so.
+ */
+export function passTurn(room, uid, now) {
+  const n = room.order.length;
+  const start = room.order.indexOf(uid);
+  const players = { ...room.players };
+  const satOut = [];
+  let next = null;
+  for (let i = 1; i <= n && !next; i++) {
+    const cand = room.order[(start + i + n) % n];
+    if (!isActive(room, cand, now)) continue;
+    if (players[cand].sitOut && cand !== uid) {
+      players[cand] = { ...players[cand], sitOut: false };
+      satOut.push(cand);
+      continue;
+    }
+    next = cand;
+  }
+  // Everyone else is sitting out: the first of them plays after all.
+  if (!next) next = satOut.shift() ?? uid;
+  if (players[next].sitOut) players[next] = { ...players[next], sitOut: false };
+  const turn = { uid: next, id: room.turn.id + 1 };
+  if (satOut.length) turn.satOut = satOut;
+  return { turn, players };
+}
+
 /** Leave a room. Returns { room: null } when the last player leaves (delete it). */
 export function leaveRoom(room, { uid, now }) {
   if (!room.players[uid]) return { room };
@@ -154,7 +186,9 @@ export function leaveRoom(room, { uid, now }) {
   let next = { ...room, players, order, updatedAt: now };
   if (room.hostUid === uid) next.hostUid = order.find((u) => isPresent(next, u, now)) ?? order[0];
   if (room.turn?.uid === uid) {
-    next.turn = { uid: nextTurnUid(room, uid, now), id: room.turn.id + 1 };
+    const passed = passTurn(room, uid, now);
+    next.turn = passed.turn;
+    for (const u of order) next.players[u] = passed.players[u];
     if (next.turn.uid === uid) next.turn = { uid: order[0], id: room.turn.id + 1 };
   }
   if (room.status === 'playing' && order.length === 1 && room.order.length > 1 && !isCoop(room)) {
@@ -210,7 +244,11 @@ export function startRound(room, { uid, seed, now }) {
   if (presentPlayers(room, now).length < 2) return { error: 'players' };
 
   const players = { ...room.players };
-  if (newMatch) for (const u of Object.keys(players)) players[u] = { ...players[u], score: 0 };
+  for (const u of Object.keys(players)) {
+    // Timeouts and sit-outs only count within a word.
+    const { misses, sitOut, ...p } = players[u];
+    players[u] = newMatch ? { ...p, score: 0 } : p;
+  }
   const round = newMatch ? 1 : room.round + 1;
   // The first turn rotates each round so nobody always goes first.
   const preferred = room.order[(round - 1) % room.order.length];
@@ -279,13 +317,28 @@ export function applyGuess(room, { uid, word, turnId, answers, valid, now }) {
     const players = { ...room.players, [uid]: { ...room.players[uid], score: room.players[uid].score + 1 } };
     return { room: { ...room, guesses, players, status: last ? 'matchOver' : 'roundOver', winner: uid, turn: null, updatedAt: now } };
   }
-  return { room: { ...room, guesses, turn: { uid: nextTurnUid(room, uid, now), id: room.turn.id + 1 }, updatedAt: now } };
+  // A guess ends any run of timeouts.
+  const { misses, ...me } = room.players[uid];
+  const passed = passTurn({ ...room, players: { ...room.players, [uid]: me } }, uid, now);
+  return { room: { ...room, guesses, players: passed.players, turn: passed.turn, updatedAt: now } };
 }
 
-/** Time ran out: skip to the next player. Null if the turn already moved on. */
-export function skipTurn(room, { turnId, now }) {
+/**
+ * Time ran out: skip to the next player. Null if the turn already moved on.
+ * A timeout (not an away player being skipped) counts toward a sit-out:
+ * MISSES_TO_SIT_OUT in a row and that player sits out their next turn.
+ */
+export function skipTurn(room, { turnId, now, timedOut = true }) {
   if (room.status !== 'playing' || room.turn?.id !== turnId) return null;
-  return { ...room, turn: { uid: nextTurnUid(room, room.turn.uid, now), id: turnId + 1 }, updatedAt: now };
+  const uid = room.turn.uid;
+  let base = room;
+  if (timedOut && !isCoop(room) && room.players[uid]) {
+    const misses = (room.players[uid].misses ?? 0) + 1;
+    const p = misses >= MISSES_TO_SIT_OUT ? { ...room.players[uid], misses: 0, sitOut: true } : { ...room.players[uid], misses };
+    base = { ...room, players: { ...room.players, [uid]: p } };
+  }
+  const passed = passTurn(base, uid, now);
+  return { ...base, players: passed.players, turn: passed.turn, updatedAt: now };
 }
 
 /** Players sorted by score, for the scoreboard. */

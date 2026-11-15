@@ -9,7 +9,7 @@ Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies
 - **Daily:** one word per day (changes at local midnight), the same for everyone.
 - **Random:** a random word, or enter a seed (0–2308) to play a specific word. Share links include the seed (`?seed=1795`).
 - **InfiniMode:** unlimited guesses. The board scrolls as you go. A clock starts with your first letter (it pauses while the game is in the background), and stats track words solved, average and fewest guesses, and your fastest time.
-- **Battle (needs Firebase):** 2–8 players take turns on one shared board with a turn timer. Type your next guess while you wait. First to find the word wins the round. Share a room link or pick a room from the lobby.
+- **Battle (needs Firebase):** 2–8 players take turns on one shared board with a turn timer. Type your next guess while you wait. First to find the word wins the round. Share a room link or pick a room from the lobby. Let the timer run out twice in a row and you sit out your next turn.
 - **Co-op (a Battle room setting):** everyone on one team, one shared board. No turns: anyone can submit a guess at any time, guesses are unlimited, and the team record tracks words solved, guesses and time.
 - **Hard mode:** any letters you've found must be used in later guesses.
 - **Stats and streaks** for Daily and Random, with a guess-distribution chart.
@@ -59,7 +59,7 @@ How it works: every player is signed in anonymously in the background and gets a
 
 Rooms live in Firestore at `rooms/{code}` (4-character codes like `KQ7P`; links are `?battle=KQ7P`). Each action (join, guess, skip, next round, leave) runs in a transaction through a pure function in `js/battle/logic.js`, so players acting at the same time can't overwrite each other.
 
-- **Turns:** the current player's device ends their own turn when the timer runs out; everyone else skips it 3 seconds later as a backup (e.g. if that phone went to sleep).
+- **Turns:** the current player's device ends their own turn when the timer runs out; everyone else skips it 3 seconds later as a backup (e.g. if that phone went to sleep). Each timeout adds to the player's `misses`; a guess resets it. Two in a row sets `sitOut`, and the next hand-off passes over that player once (`turn.satOut` lists who was passed, for the toasts). Both reset each word; skipping an away player doesn't count.
 - **Presence:** players who disconnect are skipped automatically. Switching away from the game or closing it marks you away at once, and your turns are skipped until you come back. A dropped connection is caught by heartbeats (every 10 seconds; quiet for 30 seconds = gone). If the host is gone, the next player becomes host; a host who only switched apps for a moment keeps the room.
 - **Cleanup:** every room write sets `expireAt` to 24 hours ahead (heartbeats too, so live rooms never expire). The TTL policy from setup step 5 deletes rooms past that time; Firestore usually does this within a day of expiry.
 - **Rounds:** 1–10 or ∞ (the default). An unlimited match goes on until the host taps **End match** on the round sheet.

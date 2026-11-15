@@ -71,7 +71,8 @@ export function createRoomsApi(session) {
     start: (code, seed) => mutate(code, (room, now) => L.startRound(room, { uid, seed, now })),
     guess: (code, word, turnId, answers, valid) =>
       mutate(code, (room, now) => L.applyGuess(room, { uid, word, turnId, answers, valid, now })),
-    skip: (code, turnId) => mutate(code, (room, now) => L.skipTurn(room, { turnId, now })),
+    /** timedOut = false when skipping a player who left the app (doesn't count toward a sit-out). */
+    skip: (code, turnId, timedOut = true) => mutate(code, (room, now) => L.skipTurn(room, { turnId, now, timedOut })),
     endMatch: (code) => mutate(code, (room, now) => L.endMatch(room, { uid, now })),
     claimHost: (code) => mutate(code, (room, now) => L.claimHost(room, { uid, now })),
     /** After an account switch: move oldUid's seat to this (already joined) account. */

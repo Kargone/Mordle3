@@ -154,16 +154,16 @@ export function createRaceView() {
     const order = room.order;
     const startAt = room.turn ? Math.max(0, order.indexOf(room.turn.uid)) : 0;
     const rotated = order.map((_, i) => order[(startAt + i) % order.length]);
-    const nextUid = room.turn ? rotated.find((u, i) => i > 0 && isActive(room, u, now)) : null;
+    const nextUid = room.turn ? rotated.find((u, i) => i > 0 && isActive(room, u, now) && !room.players[u].sitOut) : null;
     $('turn-strip').replaceChildren(...rotated.map((uid) => {
       const p = room.players[uid];
       const active = room.turn?.uid === uid;
       const chip = document.createElement('div');
-      chip.className = 'pchip' + (active ? ' active' : '') + (isActive(room, uid, now) ? '' : ' away');
+      chip.className = 'pchip' + (active ? ' active' : '') + (isActive(room, uid, now) ? '' : ' away') + (p.sitOut ? ' sitout' : '');
       chip.style.setProperty('--c', p.color);
       chip.appendChild(avatar(p.color, initial(p.name)));
       const label = displayName(room, uid, me) + (uid === nextUid && uid === me ? ' · next' : '');
-      chip.insertAdjacentHTML('beforeend', `<span class="nm">${esc(label)}</span><span class="sc">${p.score} won</span>`);
+      chip.insertAdjacentHTML('beforeend', `<span class="nm">${esc(label)}</span><span class="sc">${p.sitOut ? '⏸ Sits out' : `${p.score} won`}</span>`);
       if (active) chip.insertAdjacentHTML('beforeend', '<span class="secs" id="turn-secs"></span>');
       return chip;
     }));

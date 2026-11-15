@@ -59,6 +59,8 @@
 .pchip.empty .av { background: transparent; border: 2px dashed var(--line); }
 .pchip.empty { color: var(--text-faint); }
 .pchip.away { opacity: .4; }
+.pchip.sitout .sc { color: var(--text); white-space: nowrap; }
+.pchip.sitout .av { opacity: .55; }
 .crown { position: absolute; top: -10px; font-size: 13px; }
 
 /* ---------- Race screen ---------- */
