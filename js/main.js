@@ -117,7 +117,17 @@ const account = createAccountUI({
   },
 });
 
-const battle = createBattle({ cloud, keyboard, toast, announce, onHeader: renderHeader });
+const battle = createBattle({
+  cloud, keyboard, toast, announce, onHeader: renderHeader,
+  getStats: () => stats.battle,
+  onMatch(result) {
+    const next = recordGame(stats, result);
+    if (next === stats) return; // already counted
+    stats = next;
+    save('stats', stats);
+    cloud.record(result);
+  },
+});
 $('mode-menu').querySelector('[data-mode="battle"]').hidden = !cloud.enabled;
 
 /** Keep whichever copy of today's daily is further along. */

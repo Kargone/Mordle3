@@ -1,6 +1,6 @@
 // Merge rules for syncing between devices. Pure functions, no Firebase code.
 
-import { emptyBucket, emptyStats, recordGame } from './stats.js';
+import { emptyBucket, emptyBattle, emptyStats, recordGame, trimRivals } from './stats.js';
 import { evaluateGuess, MAX_GUESSES } from './game.js';
 
 /** Settings that follow you between devices. Mode is per-device. */
@@ -56,8 +56,38 @@ export function mergeBucket(a = emptyBucket(), b = emptyBucket()) {
   return out;
 }
 
+/** Battle records from two devices: counts added, rivals combined, streak from the newer one. */
+export function mergeBattle(a = emptyBattle(), b = emptyBattle()) {
+  a = { ...emptyBattle(), ...a };
+  b = { ...emptyBattle(), ...b };
+  const newer = b.lastAt > a.lastAt ? b : a;
+  const rivals = { ...a.rivals };
+  for (const [uid, r] of Object.entries(b.rivals)) {
+    const o = rivals[uid];
+    rivals[uid] = !o ? r : {
+      ...(r.last > o.last ? r : o),
+      wins: o.wins + r.wins,
+      losses: o.losses + r.losses,
+    };
+  }
+  return {
+    played: a.played + b.played,
+    wins: a.wins + b.wins,
+    roundsWon: a.roundsWon + b.roundsWon,
+    currentStreak: newer.currentStreak,
+    maxStreak: Math.max(a.maxStreak, b.maxStreak),
+    rivals: trimRivals(rivals),
+    lastMatch: newer.lastMatch,
+    lastAt: newer.lastAt,
+  };
+}
+
 export function mergeStats(a = emptyStats(), b = emptyStats()) {
-  return { daily: mergeBucket(a.daily, b.daily), random: mergeBucket(a.random, b.random) };
+  return {
+    daily: mergeBucket(a.daily, b.daily),
+    random: mergeBucket(a.random, b.random),
+    battle: mergeBattle(a.battle, b.battle),
+  };
 }
 
 /** Apply finished games that haven't reached the cloud yet. */

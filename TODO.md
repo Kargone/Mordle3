@@ -6,7 +6,8 @@
   - [ ] Publish the updated `firestore.rules` (adds `rooms`), then test with real devices
   - [x] Rooms carry `expireAt` (24h after last activity) for a Firestore TTL policy
   - [ ] Create the TTL policy in the console (README → Sync step 5)
-  - [ ] Ideas: battle stats (wins per player), quick rematch with new players, emoji reactions
+  - [x] Battle stats: matches, win %, rounds won, best streak, and a record against each rival (stats button in Battle)
+  - [ ] Ideas: quick rematch with new players, emoji reactions
 - [ ] **Firebase sync**
   - [x] **Set up the Firebase project** (see README → Sync)
   - [x] Auth: anonymous sign-in, with optional Google sign-in to link devices

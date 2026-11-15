@@ -5,8 +5,9 @@ import { randomSeed } from '../daily.js';
 import { keyboardStates, WORD_LENGTH } from '../game.js';
 import { load, save } from '../storage.js';
 import { createRoomsApi, HEARTBEAT_MS } from './net.js';
-import { sharedState, guessError, presentPlayers, isPresent, normalizeCode, cleanName, LIMITS } from './logic.js';
-import { showPanel, renderLobby, renderRoom, createRaceView, renderRoundSheet, roomUrl } from './view.js';
+import { sharedState, guessError, presentPlayers, isPresent, normalizeCode, cleanName, matchResult, LIMITS } from './logic.js';
+import { showPanel, renderLobby, renderRoom, createRaceView, renderRoundSheet, renderBattleStats, roomUrl } from './view.js';
+import { emptyBattle, rivalList } from '../stats.js';
 
 const $ = (id) => document.getElementById(id);
 const BACKUP_SKIP_MS = 3000; // others skip a stuck turn this long after the timer ends
@@ -26,9 +27,12 @@ const ERRORS = {
  * @param {{
  *   cloud: object, keyboard: object, toast: (msg: string, ms?: number) => void,
  *   announce: (text: string) => void, onHeader: () => void,
+ *   onMatch: (result: object) => void, getStats: () => object,
  * }} deps
+ * onMatch gets this player's matchResult() each time a finished match is seen
+ * (the stats code ignores repeats); getStats returns the battle stats bucket.
  */
-export function createBattle({ cloud, keyboard, toast, announce, onHeader }) {
+export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMatch, getStats }) {
   let api = null;
   let active = false; // battle mode is on screen
   let code = load('battleRoom', null);
@@ -52,6 +56,14 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader }) {
     if (api) return api;
     api = createRoomsApi(await cloud.session());
     return api;
+  }
+
+  const statsDialog = $('bstats-dialog');
+  statsDialog.addEventListener('click', (e) => { if (e.target === statsDialog) statsDialog.close(); });
+  function openStats() {
+    const battle = { ...emptyBattle(), ...getStats() };
+    renderBattleStats(battle, rivalList(battle), Date.now());
+    if (!statsDialog.open) statsDialog.showModal();
   }
 
   // ---------- room subscription ----------
@@ -112,6 +124,10 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader }) {
       }
     }
     if (prev && prev.round !== room.round) draft = '';
+    if (room.status === 'matchOver') {
+      const result = matchResult(room, me());
+      if (result) onMatch(result);
+    }
     if (room.status === 'playing' && !ticker) ticker = setInterval(tick, 100);
     if (room.status !== 'playing') { clearInterval(ticker); ticker = null; }
 
@@ -348,7 +364,7 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader }) {
 
     openSheet() {
       if (room && room.status !== 'lobby' && room.status !== 'playing') $('round-dialog').showModal();
-      else toast("Battle games aren't counted in your stats", 1800);
+      else openStats();
     },
 
     get label() {

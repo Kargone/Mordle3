@@ -257,3 +257,34 @@ export function renderRoundSheet(room, me, now, answer) {
     ? (here < 2 ? 'Everyone else has left.' : '')
     : `Waiting for ${hostName} to ${over ? 'start a new match' : 'start the next round'}`;
 }
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** "today", "yesterday", "3 days ago", "last week", "5 weeks ago", "2 months ago". */
+export function playedAgo(at, now) {
+  const days = Math.floor((now - at) / DAY);
+  if (days < 1) return 'today';
+  if (days < 2) return 'yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return 'last week';
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+  return `${Math.floor(days / 30)} months ago`;
+}
+
+/** Battle stats sheet: totals and the record against each rival. */
+export function renderBattleStats(battle, rivals, now) {
+  $('bst-played').textContent = battle.played;
+  $('bst-win').textContent = battle.played ? Math.round((battle.wins / battle.played) * 100) : 0;
+  $('bst-rounds').textContent = battle.roundsWon;
+  $('bst-best').textContent = battle.maxStreak;
+  $('bst-empty').hidden = rivals.length > 0;
+  $('bst-rivals').replaceChildren(...rivals.map((r) => {
+    const row = document.createElement('div');
+    row.className = 'rival';
+    row.innerHTML = `<div class="mini" aria-hidden="true">${esc(initial(r.name))}</div>`
+      + `<span>${esc(r.name)}<small>played ${playedAgo(r.last, now)}</small></span>`
+      + `<b class="rec" aria-label="${r.wins} wins, ${r.losses} losses"><span class="w">${r.wins}</span> – ${r.losses}</b>`;
+    row.firstChild.style.background = /^#[0-9a-f]{3,8}$/i.test(r.color ?? '') ? r.color : 'var(--raised)';
+    return row;
+  }));
+}

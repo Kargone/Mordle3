@@ -228,3 +228,25 @@ export function listable(room, now) {
   return room.public && room.status === 'lobby' && room.order.length < room.settings.maxPlayers
     && presentPlayers(room, now).length > 0;
 }
+
+/**
+ * This player's result for a finished match, for their stats. Null if the
+ * match isn't over or they weren't in it.
+ * A win means the top score alone; a shared top score is a tie.
+ */
+export function matchResult(room, uid) {
+  if (room.status !== 'matchOver' || !room.players[uid]) return null;
+  const mine = room.players[uid].score;
+  const winners = matchWinners(room);
+  return {
+    mode: 'battle',
+    match: `${room.code}-${room.seed}-${room.round}`,
+    won: winners.length === 1 && winners[0] === uid,
+    rounds: mine,
+    at: room.updatedAt,
+    opponents: room.order.filter((u) => u !== uid).map((u) => {
+      const p = room.players[u];
+      return { uid: u, name: p.name, color: p.color, result: Math.sign(mine - p.score) };
+    }),
+  };
+}

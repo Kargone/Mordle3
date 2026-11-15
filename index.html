@@ -233,6 +233,22 @@
     <p class="center"><button class="linkbtn" type="button" id="round-leave">Leave room</button></p>
   </dialog>
 
+  <!-- Battle: stats -->
+  <dialog class="sheet" id="bstats-dialog" aria-labelledby="bstats-title">
+    <div class="grab" aria-hidden="true"></div>
+    <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
+    <h2 class="hero-title" id="bstats-title">Battle stats</h2>
+    <div class="stats4">
+      <div><div class="num" id="bst-played">0</div><div class="cap">Matches</div></div>
+      <div><div class="num" id="bst-win">0</div><div class="cap">Win %</div></div>
+      <div><div class="num" id="bst-rounds">0</div><div class="cap">Rounds</div></div>
+      <div><div class="num" id="bst-best">0</div><div class="cap">Best</div></div>
+    </div>
+    <h3 class="section-label">Rivals</h3>
+    <div class="rivals" id="bst-rivals"></div>
+    <p class="rivals-empty" id="bst-empty">Finish a match to see your record against each player.</p>
+  </dialog>
+
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

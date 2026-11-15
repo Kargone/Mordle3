@@ -114,3 +114,14 @@
 
 /* Toasts sit below the turn strip so they don't cover whose turn it is. */
 [data-mode='battle'] .toasts { top: 196px; }
+
+/* Battle stats sheet */
+#bstats-dialog .hero-title { text-align: center; margin: 4px 0 16px; }
+.rivals { display: grid; gap: 6px; margin-bottom: 8px; }
+.rival { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); font-weight: 800; font-size: 14px; }
+.rival .mini { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: #10131f; }
+.rival > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rival small { display: block; font-size: 11px; color: var(--text-dim); font-weight: 700; }
+.rival .rec { font-variant-numeric: tabular-nums; }
+.rival .rec .w { color: var(--accent-fg); }
+.rivals-empty { color: var(--text-dim); font-size: 14px; text-align: center; margin: 4px 0 8px; }
