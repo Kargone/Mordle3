@@ -133,6 +133,7 @@
       <li><span class="dot" style="--dot: var(--mode-random)"></span><b>Random</b>: a random word, or enter a seed to share a word with friends.</li>
       <li><span class="dot" style="--dot: var(--mode-infini)"></span><b>InfiniMode</b>: unlimited guesses. Keep going until you get it.</li>
     </ul>
+    <p class="help-tip">Tip: hold <b>⌫</b> (or press Ctrl+Backspace) to clear the whole word.</p>
   </dialog>
 
   <!-- Settings -->
@@ -230,7 +231,7 @@
     <div class="score-table" id="round-table"></div>
     <button class="btn btn-primary btn-block" type="button" id="round-next">Next round</button>
     <p class="waiting" id="round-wait"></p>
-    <p class="center"><button class="linkbtn" type="button" id="round-leave">Leave room</button></p>
+    <p class="center"><button class="linkbtn" type="button" id="round-end" hidden>End match</button><button class="linkbtn" type="button" id="round-leave">Leave room</button></p>
   </dialog>
 
   <!-- Battle: stats -->

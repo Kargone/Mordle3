@@ -61,6 +61,7 @@ Rooms live in Firestore at `rooms/{code}` (4-character codes like `KQ7P`; links 
 - **Turns:** the current player's device ends their own turn when the timer runs out; everyone else skips it 3 seconds later as a backup (e.g. if that phone went to sleep).
 - **Presence:** each player sends a heartbeat every 20 seconds. Anyone quiet for 60 seconds is skipped in the turn order, and if the host goes quiet the next player becomes host.
 - **Cleanup:** every room write sets `expireAt` to 24 hours ahead (heartbeats too, so live rooms never expire). The TTL policy from setup step 5 deletes rooms past that time; Firestore usually does this within a day of expiry.
+- **Rounds:** 1–10 or ∞ (the default). An unlimited match goes on until the host taps **End match** on the round sheet.
 - **Stats:** when a match ends, each player's device records it once (matches, outright wins, rounds won, win streak) plus a win–loss record against each opponent, keyed by their account so name changes don't split it. The 30 most recent rivals are kept. Battle stats sync with the rest of your stats.
 - **Trust:** there's no server checking guesses (that needs Cloud Functions on the Blaze plan). The rules keep strangers out of rooms and stop non-hosts changing settings, but players in a room could cheat. Fine for playing with friends.
 

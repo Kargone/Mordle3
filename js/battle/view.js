@@ -4,11 +4,16 @@
 import { WORD_LENGTH } from '../game.js';
 import { createTile, setTile } from '../ui/board.js';
 import { reducedMotion, retrigger } from '../ui/motion.js';
-import { isPresent, presentPlayers, standings, matchWinners, LIMITS } from './logic.js';
+import { isPresent, presentPlayers, standings, matchWinners, atLimit, isUnlimited, LIMITS } from './logic.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initial = (name) => (name || '?').trim().charAt(0).toUpperCase() || '?';
+/** "3 rounds", "1 round", "∞ rounds". */
+export const roundsText = (room) => (isUnlimited(room) ? '∞ rounds'
+  : `${room.settings.rounds} round${room.settings.rounds === 1 ? '' : 's'}`);
+/** "round 2 of 3", or "round 2" when unlimited. */
+export const roundOf = (room) => `round ${room.round}${isUnlimited(room) ? '' : ` of ${room.settings.rounds}`}`;
 const displayName = (room, uid, me) => (uid === me ? 'You' : room.players[uid]?.name ?? 'Player');
 
 function avatar(color, text, cls = 'av') {
@@ -48,7 +53,7 @@ export function renderLobby({ rooms, connecting, onJoin }) {
     const row = document.createElement('div');
     row.className = 'room-row';
     row.innerHTML = `<b>${esc(host)}'s room${room.settings.hard ? '<span class="badge">HARD</span>' : ''}</b>
-      <span class="meta">${room.order.length}/${room.settings.maxPlayers} players · ${room.settings.turnSecs}s turns · ${room.settings.rounds} round${room.settings.rounds === 1 ? '' : 's'}</span>`;
+      <span class="meta">${room.order.length}/${room.settings.maxPlayers} players · ${room.settings.turnSecs}s turns · ${roundsText(room)}</span>`;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-secondary join';
@@ -89,9 +94,9 @@ export function renderRoom(room, me, now) {
   for (const key of Object.keys(LIMITS)) {
     const row = document.querySelector(`[data-setting="${key}"]`);
     const v = room.settings[key];
-    row.querySelector('.val').textContent = key === 'turnSecs' ? `${v}s` : v;
-    row.querySelector('[data-step="-1"]').disabled = !isHost || v <= Math.max(LIMITS[key].min, key === 'maxPlayers' ? room.order.length : 0);
-    row.querySelector('[data-step="1"]').disabled = !isHost || v >= LIMITS[key].max;
+    row.querySelector('.val').textContent = key === 'turnSecs' ? `${v}s` : key === 'rounds' && isUnlimited(room) ? '∞' : v;
+    row.querySelector('[data-step="-1"]').disabled = !isHost || atLimit(key, v, -1) || (key === 'maxPlayers' && v <= room.order.length);
+    row.querySelector('[data-step="1"]').disabled = !isHost || atLimit(key, v, 1);
   }
   $('room-hard').checked = room.settings.hard;
   $('room-public').checked = room.public;
@@ -237,7 +242,7 @@ export function renderRoundSheet(room, me, now, answer) {
   }
   $('round-answer').replaceChildren(...[...answer].map((l) => createTile(l, 'correct')));
   const winGuess = room.guesses.length;
-  $('round-meta').textContent = `${w ? `on guess ${winGuess} · ` : ''}round ${room.round} of ${room.settings.rounds}${over ? ' · final score' : ''}`;
+  $('round-meta').textContent = `${w ? `on guess ${winGuess} · ` : ''}${roundOf(room)}${over ? ' · final score' : ''}`;
 
   $('round-table').replaceChildren(...standings(room).map((p) => {
     const r = document.createElement('div');
@@ -252,6 +257,8 @@ export function renderRoundSheet(room, me, now, answer) {
   next.hidden = !isHost;
   next.textContent = over ? 'Play again' : 'Next round';
   next.disabled = here < 2;
+  // Unlimited matches end when the host says so.
+  $('round-end').hidden = !isHost || over || !isUnlimited(room);
   const hostName = room.players[room.hostUid]?.name ?? 'the host';
   $('round-wait').textContent = isHost
     ? (here < 2 ? 'Everyone else has left.' : '')

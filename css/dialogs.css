@@ -145,3 +145,4 @@ dialog p { margin: 0 0 10px; color: var(--text); }
 .sync-nudge p { margin: 0; flex: 1; font-size: 13px; color: var(--text-dim); }
 .sync-nudge p b { display: block; color: var(--text); font-size: 14px; }
 .sync-nudge.synced { justify-content: center; padding: 9px 14px; }
+.help-tip { color: var(--text-dim); font-size: 13px; margin: 12px 0 0; }

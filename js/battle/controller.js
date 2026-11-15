@@ -6,7 +6,7 @@ import { keyboardStates, WORD_LENGTH } from '../game.js';
 import { load, save } from '../storage.js';
 import { createRoomsApi, HEARTBEAT_MS } from './net.js';
 import { sharedState, guessError, presentPlayers, isPresent, normalizeCode, cleanName, matchResult, LIMITS } from './logic.js';
-import { showPanel, renderLobby, renderRoom, createRaceView, renderRoundSheet, renderBattleStats, roomUrl } from './view.js';
+import { showPanel, renderLobby, renderRoom, createRaceView, renderRoundSheet, renderBattleStats, roomUrl, roundOf } from './view.js';
 import { emptyBattle, rivalList } from '../stats.js';
 
 const $ = (id) => document.getElementById(id);
@@ -312,6 +312,7 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
   $('room-leave').addEventListener('click', leave);
   $('round-next').addEventListener('click', startOrNext);
   $('round-leave').addEventListener('click', leave);
+  $('round-end').addEventListener('click', () => code && run(api.endMatch(code)));
   $('round-dialog').addEventListener('click', (e) => { if (e.target === $('round-dialog')) $('round-dialog').close(); });
 
   return {
@@ -356,7 +357,8 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
         return;
       }
       if (key === 'enter') return submit();
-      if (key === 'back') draft = draft.slice(0, -1);
+      if (key === 'clear') draft = '';
+      else if (key === 'back') draft = draft.slice(0, -1);
       else if (draft.length < WORD_LENGTH) draft += key;
       else return;
       render();
@@ -370,7 +372,8 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     get label() {
       if (!room) return '⚔ Battle';
       if (room.status === 'lobby') return `⚔ Battle · ${room.code}`;
-      return `⚔ Battle · Round ${room.round} of ${room.settings.rounds}`;
+      const r = roundOf(room);
+      return `⚔ Battle · ${r[0].toUpperCase()}${r.slice(1)}`;
     },
 
     get inRoom() { return !!code; },

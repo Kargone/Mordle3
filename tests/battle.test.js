@@ -196,3 +196,28 @@ test('battle stats: record once, streaks, rivals, merge', async () => {
   assert.equal(Object.keys(many.battle.rivals).length, MAX_RIVALS, 'only recent rivals kept');
   assert.ok(many.battle.rivals['u' + (MAX_RIVALS + 4)] && !many.battle.rivals.u0);
 });
+
+test('rounds: unlimited by default, stepper goes 1…10 then ∞, host ends the match', async () => {
+  const { stepSetting, atLimit, endMatch, UNLIMITED } = await import('../js/battle/logic.js');
+  assert.equal(stepSetting('rounds', 10, 1), UNLIMITED);
+  assert.equal(stepSetting('rounds', UNLIMITED, -1), 10);
+  assert.equal(stepSetting('rounds', UNLIMITED, 1), UNLIMITED);
+  assert.equal(stepSetting('rounds', 1, -1), 1);
+  assert.ok(atLimit('rounds', UNLIMITED, 1) && atLimit('rounds', 1, -1) && !atLimit('rounds', 10, 1));
+  assert.equal(stepSetting('turnSecs', 60, 1), 60);
+  assert.equal(stepSetting('turnSecs', 10, -1), 5);
+  assert.equal(cleanSettings({ rounds: 0 }).rounds, UNLIMITED);
+
+  let room = roomOf(['mia', 'you']);
+  assert.equal(room.settings.rounds, UNLIMITED);
+  for (let r = 1; r <= 12; r++) {
+    room = startRound(room, { uid: 'mia', seed: SEED, now: T }).room;
+    room = guess(room, room.turn.uid, 'lemon').room;
+    assert.equal(room.status, 'roundOver', `round ${r} doesn't end the match`);
+  }
+  assert.equal(endMatch(room, { uid: 'you', now: T }), null, 'only the host');
+  room = endMatch(room, { uid: 'mia', now: T });
+  assert.equal(room.status, 'matchOver');
+  assert.deepEqual(standings(room).map((p) => p.score), [6, 6]);
+  assert.equal(endMatch(room, { uid: 'mia', now: T }), null, 'already over');
+});

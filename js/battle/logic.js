@@ -2,7 +2,8 @@
 //
 // Players take turns guessing on one shared board. A turn lasts
 // settings.turnSecs; when it runs out the turn is skipped. The first player to
-// guess the word wins the round. A match is settings.rounds rounds.
+// guess the word wins the round. A match is settings.rounds rounds
+// (0 = unlimited: it goes on until the host ends it).
 //
 // Room shape (one Firestore doc, rooms/{code}):
 // {
@@ -22,7 +23,8 @@ export const LIMITS = {
   rounds: { min: 1, max: 10, step: 1 },
   maxPlayers: { min: 2, max: 8, step: 1 },
 };
-export const DEFAULT_SETTINGS = { turnSecs: 10, rounds: 3, maxPlayers: 8, hard: false };
+export const DEFAULT_SETTINGS = { turnSecs: 10, rounds: 0, maxPlayers: 8, hard: false };
+export const UNLIMITED = 0; // settings.rounds value for "keep playing until the host ends the match"
 export const AWAY_MS = 60_000; // no heartbeat for this long = gone
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -44,11 +46,31 @@ const clamp = (n, { min, max }) => Math.min(max, Math.max(min, Math.round(Number
 export function cleanSettings(s = {}) {
   return {
     turnSecs: clamp(s.turnSecs ?? DEFAULT_SETTINGS.turnSecs, LIMITS.turnSecs),
-    rounds: clamp(s.rounds ?? DEFAULT_SETTINGS.rounds, LIMITS.rounds),
+    rounds: Number(s.rounds ?? DEFAULT_SETTINGS.rounds) === UNLIMITED ? UNLIMITED : clamp(s.rounds, LIMITS.rounds),
     maxPlayers: clamp(s.maxPlayers ?? DEFAULT_SETTINGS.maxPlayers, LIMITS.maxPlayers),
     hard: !!s.hard,
   };
 }
+
+/**
+ * A stepper press: the setting's next value. Rounds go 1 … 10, then ∞ (unlimited).
+ */
+export function stepSetting(key, value, step) {
+  const lim = LIMITS[key];
+  if (key === 'rounds') {
+    const pos = value === UNLIMITED ? lim.max + 1 : value; // ∞ sits just past the max
+    const next = Math.min(lim.max + 1, Math.max(lim.min, pos + step));
+    return next > lim.max ? UNLIMITED : next;
+  }
+  return Math.min(lim.max, Math.max(lim.min, value + step * lim.step));
+}
+
+/** Last stepper position? (for disabling − and +) */
+export function atLimit(key, value, step) {
+  return stepSetting(key, value, step) === value;
+}
+
+export const isUnlimited = (room) => room.settings.rounds === UNLIMITED;
 
 export function isPresent(room, uid, now) {
   const p = room.players?.[uid];
@@ -166,6 +188,12 @@ export function startRound(room, { uid, seed, now }) {
   };
 }
 
+/** Host ends the match between rounds (how an unlimited match finishes). */
+export function endMatch(room, { uid, now }) {
+  if (uid !== room.hostUid || room.status !== 'roundOver') return null;
+  return { ...room, status: 'matchOver', updatedAt: now };
+}
+
 /** The shared board as a solo-style game state (for coloring and hard mode). */
 export function sharedState(room, answers) {
   const answer = answers[room.seed] ?? '';
@@ -198,7 +226,7 @@ export function applyGuess(room, { uid, word, turnId, answers, valid, now }) {
   const guesses = [...room.guesses, { uid, word }];
   if (word === answers[room.seed]) {
     const players = { ...room.players, [uid]: { ...room.players[uid], score: room.players[uid].score + 1 } };
-    const status = room.round >= room.settings.rounds ? 'matchOver' : 'roundOver';
+    const status = !isUnlimited(room) && room.round >= room.settings.rounds ? 'matchOver' : 'roundOver';
     return { room: { ...room, guesses, players, status, winner: uid, turn: null, updatedAt: now } };
   }
   return { room: { ...room, guesses, turn: { uid: nextTurnUid(room, uid, now), id: room.turn.id + 1 }, updatedAt: now } };

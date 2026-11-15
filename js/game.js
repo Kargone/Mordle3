@@ -59,6 +59,12 @@ export function removeLetter(state) {
   return { ...state, current: state.current.slice(0, -1) };
 }
 
+/** Clear the letters typed in the current row. */
+export function clearWord(state) {
+  if (state.status !== 'playing' || state.current.length === 0) return state;
+  return { ...state, current: '' };
+}
+
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th'];
 
 /**

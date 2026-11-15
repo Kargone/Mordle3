@@ -6,7 +6,7 @@ const ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 
 /**
  * @param {HTMLElement} el
- * @param {(key: string) => void} onKey  receives 'a'..'z', 'enter' or 'back'
+ * @param {(key: string) => void} onKey  receives 'a'..'z', 'enter', 'back', or 'clear' (hold ⌫)
  */
 export function createKeyboard(el, onKey) {
   const keys = {};
@@ -31,13 +31,30 @@ export function createKeyboard(el, onKey) {
     el.appendChild(row);
   });
 
+  // Holding backspace clears the whole word.
+  const HOLD_MS = 450;
+  let holdTimer = null;
+  let held = false;
+  const stopHold = () => { clearTimeout(holdTimer); holdTimer = null; };
+
   // Keep focus off the keys so a physical Enter never "clicks" the last key tapped.
   el.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.key')) e.preventDefault();
+    const key = e.target.closest('.key');
+    if (!key) return;
+    e.preventDefault();
+    held = false;
+    stopHold();
+    if (key.dataset.key === 'back') {
+      holdTimer = setTimeout(() => { held = true; holdTimer = null; onKey('clear'); }, HOLD_MS);
+    }
   });
+  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(type, stopHold);
+  el.addEventListener('contextmenu', (e) => { if (e.target.closest('.key')) e.preventDefault(); });
   el.addEventListener('click', (e) => {
     const key = e.target.closest('.key');
-    if (key) onKey(key.dataset.key);
+    if (!key) return;
+    if (held) { held = false; return; } // the hold already cleared the word
+    onKey(key.dataset.key);
   });
 
   return {

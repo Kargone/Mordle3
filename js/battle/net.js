@@ -65,13 +65,14 @@ export function createRoomsApi(session) {
     leave: (code) => mutate(code, (room, now) => L.leaveRoom(room, { uid, now })),
     /** step: +1/-1 for a stepper (applied to the latest value, so quick taps all count); else value. */
     settings: (code, key, { step, value }) => mutate(code, (room, now) => {
-      const patch = step != null ? { [key]: room.settings[key] + step * L.LIMITS[key].step } : { [key]: value };
+      const patch = step != null ? { [key]: L.stepSetting(key, room.settings[key], step) } : { [key]: value };
       return L.updateSettings(room, { uid, patch, now });
     }),
     start: (code, seed) => mutate(code, (room, now) => L.startRound(room, { uid, seed, now })),
     guess: (code, word, turnId, answers, valid) =>
       mutate(code, (room, now) => L.applyGuess(room, { uid, word, turnId, answers, valid, now })),
     skip: (code, turnId) => mutate(code, (room, now) => L.skipTurn(room, { turnId, now })),
+    endMatch: (code) => mutate(code, (room, now) => L.endMatch(room, { uid, now })),
     claimHost: (code) => mutate(code, (room, now) => L.claimHost(room, { uid, now })),
 
     /** Cheap presence ping: a field update, not a transaction. */

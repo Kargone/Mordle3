@@ -1,7 +1,7 @@
 // Entry point: owns app state, wires input to game logic and UI.
 
 import { ANSWERS, VALID } from './words.js';
-import { createGame, addLetter, removeLetter, submitGuess, keyboardStates } from './game.js';
+import { createGame, addLetter, removeLetter, clearWord, submitGuess, keyboardStates } from './game.js';
 import { dayNumber, dailyAnswerIndex, parseSeed, randomSeed } from './daily.js';
 import { load, save } from './storage.js';
 import { emptyStats, recordGame, effectiveStreak } from './stats.js';
@@ -210,8 +210,8 @@ async function handleKey(key) {
     return;
   }
 
-  if (key === 'back') {
-    slot.state = removeLetter(state);
+  if (key === 'back' || key === 'clear') {
+    slot.state = key === 'clear' ? clearWord(state) : removeLetter(state);
     board.render(slot.state);
     saveGames();
     return;
@@ -294,19 +294,22 @@ function updateSheetAccount() {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  // Ctrl+Backspace (Alt or Cmd on a Mac) clears the word, like in a text field.
+  const clear = k === 'backspace' && (e.ctrlKey || e.metaKey || e.altKey);
+  if ((e.ctrlKey || e.metaKey || e.altKey) && !clear) return;
   if (document.querySelector('dialog[open]') || !$('mode-menu').hidden) return;
   if (e.target instanceof HTMLInputElement) return;
 
-  const k = e.key.toLowerCase();
   let key = null;
-  if (k === 'enter') key = 'enter';
+  if (clear) key = 'clear';
+  else if (k === 'enter') key = 'enter';
   else if (k === 'backspace') key = 'back';
   else if (/^[a-z]$/.test(k)) key = k;
   if (!key) return;
 
   e.preventDefault();
-  keyboard.flash(key);
+  keyboard.flash(key === 'clear' ? 'back' : key);
   handleKey(key);
 });
 

@@ -125,3 +125,4 @@
 .rival .rec { font-variant-numeric: tabular-nums; }
 .rival .rec .w { color: var(--accent-fg); }
 .rivals-empty { color: var(--text-dim); font-size: 14px; text-align: center; margin: 4px 0 8px; }
+#round-end { margin-right: 18px; }
