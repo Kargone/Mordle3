@@ -4,7 +4,8 @@
 
 - [x] **Battle mode**: 2–8 players take turns on one shared board (turn timer, skip on timeout, type ahead). First to find the word wins the round. Room links + public lobby browser.
   - [ ] Publish the updated `firestore.rules` (adds `rooms`), then test with real devices
-  - [ ] Optional: Firestore TTL policy on `rooms` so abandoned rooms get deleted (rooms with nobody present are already hidden from the lobby)
+  - [x] Rooms carry `expireAt` (24h after last activity) for a Firestore TTL policy
+  - [ ] Create the TTL policy in the console (README → Sync step 5)
   - [ ] Ideas: battle stats (wins per player), quick rematch with new players, emoji reactions
 - [ ] **Firebase sync**
   - [x] **Set up the Firebase project** (see README → Sync)

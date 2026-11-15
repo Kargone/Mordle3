@@ -5,6 +5,10 @@
 import * as L from './logic.js';
 
 export const HEARTBEAT_MS = 20_000;
+// Every write pushes expireAt a day ahead. With a Firestore TTL policy on
+// rooms.expireAt, rooms nobody has touched for a day get deleted automatically.
+export const ROOM_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const expiry = (now) => new Date(now + ROOM_LIFETIME_MS);
 
 /**
  * @param {{fb: object, db: object, uid: string}} session from cloud.session()
@@ -27,12 +31,13 @@ export function createRoomsApi(session) {
     return fb.runTransaction(db, async (tx) => {
       const snap = await tx.get(roomRef(code));
       if (!snap.exists()) return { error: 'gone' };
-      const out = change(snap.data(), Date.now());
+      const now = Date.now();
+      const out = change(snap.data(), now);
       if (!out) return { room: snap.data(), unchanged: true };
       if (out.error) return out;
       const next = 'room' in out ? out.room : out;
       if (next === null) tx.delete(roomRef(code));
-      else tx.set(roomRef(code), next);
+      else tx.set(roomRef(code), { ...next, expireAt: expiry(now) });
       return { room: next };
     });
   }
@@ -46,8 +51,9 @@ export function createRoomsApi(session) {
         const made = await fb.runTransaction(db, async (tx) => {
           const snap = await tx.get(roomRef(code));
           if (snap.exists()) return null;
-          const room = L.createRoom({ code, uid, name, now: Date.now() });
-          tx.set(roomRef(code), room);
+          const now = Date.now();
+          const room = L.createRoom({ code, uid, name, now });
+          tx.set(roomRef(code), { ...room, expireAt: expiry(now) });
           return room;
         });
         if (made) return made;
@@ -71,7 +77,7 @@ export function createRoomsApi(session) {
     /** Cheap presence ping: a field update, not a transaction. */
     heartbeat(code) {
       const now = Date.now();
-      return fb.updateDoc(roomRef(code), { [`players.${uid}.seen`]: now, updatedAt: now });
+      return fb.updateDoc(roomRef(code), { [`players.${uid}.seen`]: now, updatedAt: now, expireAt: expiry(now) });
     },
 
     watch(code, onRoom, onError) {

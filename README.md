@@ -50,6 +50,7 @@ Sync is off until `js/firebase-config.js` has a config. Without it the game work
 2. **Authentication → Sign-in method:** enable **Anonymous** and **Google**.
 3. **Authentication → Settings → Authorized domains:** add your Netlify domain.
 4. **Firestore Database:** create a database (production mode), then paste `firestore.rules` into the **Rules** tab and publish. Re-publish whenever `firestore.rules` changes.
+5. Optional, **Firestore Database → Time-to-live (TTL)** (it may be under the database's settings): create a policy with collection group `rooms` and timestamp field `expireAt`. Abandoned battle rooms are then deleted about a day after their last activity. Without it they just sit there, hidden from the lobby.
 
 How it works: every player is signed in anonymously in the background and gets a `users/{uid}` document. Signing in with Google links that account. If the Google account already has stats from another device, this device's stats are merged in once (counts added, best streak kept, a daily played on both devices counted once). Finished games go into a small queue and are applied to the cloud stats in a transaction, so devices never overwrite each other and games played offline upload later. Today's daily also syncs: submitted guesses are saved as you play, and whichever device is further along wins, so you can start on your phone and finish on your laptop. Settings (hard mode, theme, contrast) follow the most recent change. Signing out clears stats from this device; they stay in the Google account.
 
@@ -59,6 +60,7 @@ Rooms live in Firestore at `rooms/{code}` (4-character codes like `KQ7P`; links 
 
 - **Turns:** the current player's device ends their own turn when the timer runs out; everyone else skips it 3 seconds later as a backup (e.g. if that phone went to sleep).
 - **Presence:** each player sends a heartbeat every 20 seconds. Anyone quiet for 60 seconds is skipped in the turn order, and if the host goes quiet the next player becomes host.
+- **Cleanup:** every room write sets `expireAt` to 24 hours ahead (heartbeats too, so live rooms never expire). The TTL policy from setup step 5 deletes rooms past that time; Firestore usually does this within a day of expiry.
 - **Trust:** there's no server checking guesses (that needs Cloud Functions on the Blaze plan). The rules keep strangers out of rooms and stop non-hosts changing settings, but players in a room could cheat. Fine for playing with friends.
 
 ## Project layout
