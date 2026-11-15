@@ -221,3 +221,16 @@ test('rounds: unlimited by default, stepper goes 1…10 then ∞, host ends the 
   assert.deepEqual(standings(room).map((p) => p.score), [6, 6]);
   assert.equal(endMatch(room, { uid: 'mia', now: T }), null, 'already over');
 });
+
+test('away players (app closed or in the background) are skipped; rejoining clears it', async () => {
+  const { isActive } = await import('../js/battle/logic.js');
+  let room = roomOf(['mia', 'you', 'kai']);
+  room = { ...room, players: { ...room.players, you: { ...room.players.you, away: true } } };
+  assert.ok(!isActive(room, 'you', T));
+  assert.equal(nextTurnUid(room, 'mia', T), 'kai');
+  assert.equal(claimHost({ ...room, hostUid: 'you' }, { uid: 'mia', now: T }), null, "away isn't gone: host stays");
+  room = startRound(room, { uid: 'mia', seed: SEED, now: T }).room;
+  room = skipTurn(room, { turnId: room.turn.id, now: T });
+  assert.equal(room.turn.uid, 'kai');
+  assert.equal(joinRoom(room, { uid: 'you', name: 'you', now: T }).room.players.you.away, false);
+});

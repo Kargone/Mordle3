@@ -4,7 +4,7 @@
 
 import * as L from './logic.js';
 
-export const HEARTBEAT_MS = 20_000;
+export const HEARTBEAT_MS = 10_000;
 // Every write pushes expireAt a day ahead. With a Firestore TTL policy on
 // rooms.expireAt, rooms nobody has touched for a day get deleted automatically.
 export const ROOM_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -75,10 +75,12 @@ export function createRoomsApi(session) {
     endMatch: (code) => mutate(code, (room, now) => L.endMatch(room, { uid, now })),
     claimHost: (code) => mutate(code, (room, now) => L.claimHost(room, { uid, now })),
 
-    /** Cheap presence ping: a field update, not a transaction. */
-    heartbeat(code) {
+    /** Cheap presence ping: a field update, not a transaction. away = the app is closing or going to the background. */
+    heartbeat(code, away = false) {
       const now = Date.now();
-      return fb.updateDoc(roomRef(code), { [`players.${uid}.seen`]: now, updatedAt: now, expireAt: expiry(now) });
+      return fb.updateDoc(roomRef(code), {
+        [`players.${uid}.seen`]: now, [`players.${uid}.away`]: away, updatedAt: now, expireAt: expiry(now),
+      });
     },
 
     watch(code, onRoom, onError) {

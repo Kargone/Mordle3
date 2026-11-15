@@ -9,7 +9,7 @@
 // {
 //   code, hostUid, public, status: 'lobby' | 'playing' | 'roundOver' | 'matchOver',
 //   settings: { turnSecs, rounds, maxPlayers, hard },
-//   players: { [uid]: { name, color, score, seen } },   // seen = ms timestamp
+//   players: { [uid]: { name, color, score, seen, away } }, // seen = ms timestamp; away = app closed or in the background
 //   order: [uid, ...],                                    // join order
 //   round, seed, guesses: [{ uid, word }], turn: { uid, id } | null,
 //   winner, createdAt, updatedAt
@@ -25,7 +25,7 @@ export const LIMITS = {
 };
 export const DEFAULT_SETTINGS = { turnSecs: 10, rounds: 0, maxPlayers: 8, hard: false };
 export const UNLIMITED = 0; // settings.rounds value for "keep playing until the host ends the match"
-export const AWAY_MS = 60_000; // no heartbeat for this long = gone
+export const AWAY_MS = 30_000; // no heartbeat for this long = gone
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 export function makeCode(rand = Math.random) {
@@ -77,6 +77,14 @@ export function isPresent(room, uid, now) {
   return !!p && now - (p.seen ?? 0) < AWAY_MS;
 }
 
+/**
+ * Can take a turn: present, and the game isn't closed or in the background.
+ * (Hosting only needs isPresent, so a quick app switch doesn't hand the room over.)
+ */
+export function isActive(room, uid, now) {
+  return isPresent(room, uid, now) && !room.players[uid].away;
+}
+
 export const presentPlayers = (room, now) => room.order.filter((uid) => isPresent(room, uid, now));
 
 export function createRoom({ code, uid, name, now }) {
@@ -102,7 +110,7 @@ export function createRoom({ code, uid, name, now }) {
 export function joinRoom(room, { uid, name, now }) {
   const existing = room.players[uid];
   if (existing) {
-    return { room: { ...room, players: { ...room.players, [uid]: { ...existing, name: cleanName(name) || existing.name, seen: now } }, updatedAt: now } };
+    return { room: { ...room, players: { ...room.players, [uid]: { ...existing, name: cleanName(name) || existing.name, seen: now, away: false } }, updatedAt: now } };
   }
   if (room.status !== 'lobby') return { error: 'started' };
   if (room.order.length >= room.settings.maxPlayers) return { error: 'full' };
@@ -118,13 +126,13 @@ export function joinRoom(room, { uid, name, now }) {
   };
 }
 
-/** Next present player after `uid` in turn order. Falls back to `uid` if nobody else is here. */
+/** Next active player after `uid` in turn order. Falls back to `uid` if nobody else is here. */
 export function nextTurnUid(room, uid, now) {
   const n = room.order.length;
   const start = room.order.indexOf(uid);
   for (let i = 1; i <= n; i++) {
     const cand = room.order[(start + i + n) % n];
-    if (isPresent(room, cand, now)) return cand;
+    if (isActive(room, cand, now)) return cand;
   }
   return uid;
 }
@@ -175,7 +183,7 @@ export function startRound(room, { uid, seed, now }) {
   const round = newMatch ? 1 : room.round + 1;
   // The first turn rotates each round so nobody always goes first.
   const preferred = room.order[(round - 1) % room.order.length];
-  const first = isPresent(room, preferred, now) ? preferred : nextTurnUid(room, preferred, now);
+  const first = isActive(room, preferred, now) ? preferred : nextTurnUid(room, preferred, now);
   return {
     room: {
       ...room, players, round, seed,

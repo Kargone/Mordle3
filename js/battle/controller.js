@@ -66,6 +66,16 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     if (!statsDialog.open) statsDialog.showModal();
   }
 
+  // Leaving the app (switching apps, locking the phone, closing the tab) marks
+  // this player away so their turns are skipped at once; coming back clears it.
+  function markAway(away) {
+    if (!code || !api || !room) return;
+    api.heartbeat(code, away).catch(() => {});
+  }
+  document.addEventListener('visibilitychange', () => markAway(document.hidden));
+  window.addEventListener('pagehide', () => markAway(true));
+  window.addEventListener('pageshow', (e) => { if (e.persisted) markAway(false); });
+
   // ---------- room subscription ----------
   function enterRoom(nextCode, firstRoom) {
     if (code !== nextCode || !unwatchRoom) {
@@ -148,7 +158,10 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
     const mine = room.turn.uid === me();
     // The current player's device ends their own turn; everyone else is a backup
     // in case that device went to sleep or lost connection.
-    if (elapsed >= total + (mine ? 0 : BACKUP_SKIP_MS) && skippedId !== room.turn.id) {
+    // A player who closed the game or switched away is skipped right away. (Only the
+    // away flag is trusted here; comparing timestamps across devices can be off.)
+    const gone = !mine && !!room.players[room.turn.uid]?.away;
+    if ((gone || elapsed >= total + (mine ? 0 : BACKUP_SKIP_MS)) && skippedId !== room.turn.id) {
       skippedId = room.turn.id;
       if (mine) toast("Time's up!", 1000);
       api.skip(code, room.turn.id).catch((err) => console.warn('Skip failed:', err?.code ?? err));

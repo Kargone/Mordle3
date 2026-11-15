@@ -4,7 +4,7 @@
 import { WORD_LENGTH } from '../game.js';
 import { createTile, setTile } from '../ui/board.js';
 import { reducedMotion, retrigger } from '../ui/motion.js';
-import { isPresent, presentPlayers, standings, matchWinners, atLimit, isUnlimited, LIMITS } from './logic.js';
+import { isPresent, isActive, presentPlayers, standings, matchWinners, atLimit, isUnlimited, LIMITS } from './logic.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -77,7 +77,7 @@ export function renderRoom(room, me, now) {
   for (const uid of room.order) {
     const p = room.players[uid];
     const chip = document.createElement('div');
-    chip.className = 'pchip' + (isPresent(room, uid, now) ? '' : ' away');
+    chip.className = 'pchip' + (isActive(room, uid, now) ? '' : ' away');
     chip.appendChild(avatar(p.color, initial(p.name)));
     if (uid === room.hostUid) chip.insertAdjacentHTML('beforeend', '<span class="crown" aria-label="host">👑</span>');
     chip.insertAdjacentHTML('beforeend', `<span class="nm">${esc(uid === me ? `${p.name} (you)` : p.name)}</span>`);
@@ -128,12 +128,12 @@ export function createRaceView() {
     const order = room.order;
     const startAt = room.turn ? Math.max(0, order.indexOf(room.turn.uid)) : 0;
     const rotated = order.map((_, i) => order[(startAt + i) % order.length]);
-    const nextUid = room.turn ? rotated.find((u, i) => i > 0 && isPresent(room, u, now)) : null;
+    const nextUid = room.turn ? rotated.find((u, i) => i > 0 && isActive(room, u, now)) : null;
     $('turn-strip').replaceChildren(...rotated.map((uid) => {
       const p = room.players[uid];
       const active = room.turn?.uid === uid;
       const chip = document.createElement('div');
-      chip.className = 'pchip' + (active ? ' active' : '') + (isPresent(room, uid, now) ? '' : ' away');
+      chip.className = 'pchip' + (active ? ' active' : '') + (isActive(room, uid, now) ? '' : ' away');
       chip.style.setProperty('--c', p.color);
       chip.appendChild(avatar(p.color, initial(p.name)));
       const label = displayName(room, uid, me) + (uid === nextUid && uid === me ? ' · next' : '');

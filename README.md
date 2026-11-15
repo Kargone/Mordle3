@@ -59,7 +59,7 @@ How it works: every player is signed in anonymously in the background and gets a
 Rooms live in Firestore at `rooms/{code}` (4-character codes like `KQ7P`; links are `?battle=KQ7P`). Each action (join, guess, skip, next round, leave) runs in a transaction through a pure function in `js/battle/logic.js`, so players acting at the same time can't overwrite each other.
 
 - **Turns:** the current player's device ends their own turn when the timer runs out; everyone else skips it 3 seconds later as a backup (e.g. if that phone went to sleep).
-- **Presence:** each player sends a heartbeat every 20 seconds. Anyone quiet for 60 seconds is skipped in the turn order, and if the host goes quiet the next player becomes host.
+- **Presence:** players who disconnect are skipped automatically. Switching away from the game or closing it marks you away at once, and your turns are skipped until you come back. A dropped connection is caught by heartbeats (every 10 seconds; quiet for 30 seconds = gone). If the host is gone, the next player becomes host; a host who only switched apps for a moment keeps the room.
 - **Cleanup:** every room write sets `expireAt` to 24 hours ahead (heartbeats too, so live rooms never expire). The TTL policy from setup step 5 deletes rooms past that time; Firestore usually does this within a day of expiry.
 - **Rounds:** 1–10 or ∞ (the default). An unlimited match goes on until the host taps **End match** on the round sheet.
 - **Stats:** when a match ends, each player's device records it once (matches, outright wins, rounds won, win streak) plus a win–loss record against each opponent, keyed by their account so name changes don't split it. The 30 most recent rivals are kept. Battle stats sync with the rest of your stats.
