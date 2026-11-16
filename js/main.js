@@ -429,6 +429,7 @@ $('share-btn').addEventListener('click', async () => {
     won: state.status === 'won',
     hard: state.hard,
     infinite: state.infinite,
+    ms: mode === 'infini' ? clockMs(slot.clock, Date.now()) : 0,
     url,
   });
   const touch = matchMedia('(pointer: coarse)').matches;

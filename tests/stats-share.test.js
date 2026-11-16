@@ -49,5 +49,9 @@ test('share text', () => {
   const lost = buildShareText({ mode: 'random', seed: 1795, evaluations, won: false });
   assert.ok(lost.startsWith('Mordle seed 1795 X/6\n'));
   const inf = buildShareText({ mode: 'random', seed: 3, evaluations, won: true, infinite: true });
-  assert.ok(inf.startsWith('Mordle seed 3 2 ∞'));
+  assert.ok(inf.startsWith('Mordle seed 3 2 ∞\n'));
+  const timed = buildShareText({ mode: 'random', seed: 3, evaluations, won: true, infinite: true, hard: true, ms: 134_500 });
+  assert.ok(timed.startsWith('Mordle seed 3 2 ∞* ⏱ 2:14\n'), timed);
+  const notInfini = buildShareText({ mode: 'daily', day: 12, evaluations, won: true, ms: 134_500 });
+  assert.ok(!notInfini.includes('⏱'));
 });
