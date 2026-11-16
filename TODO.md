@@ -25,6 +25,9 @@
 - [x] InfiniMode scrolls to the very bottom
 - [x] InfiniMode time and guess stats, with a live clock
 - [x] Ctrl+Backspace / hold ⌫ clears the word
+- [x] **Leaderboards** for Google-signed-in players: Today, Daily streaks, InfiniMode, Battle; rank card after each game
+  - [ ] Publish the updated `firestore.rules` (adds `leaders` and `days/{day}/scores`)
+  - [ ] Check with a real Google account: entry appears, Hide me removes it
 
 ## Checklist: things to check by hand
 

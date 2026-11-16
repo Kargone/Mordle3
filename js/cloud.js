@@ -39,6 +39,7 @@ export function createCloud(config, hooks) {
   let session = null; // { fb, db, uid, name } once signed in
   const waiters = [];
   let lastUid = null; // to notice account switches
+  let lastData = null; // settings and daily from the latest snapshot
   const switchListeners = [];
 
   const pending = () => load('pending', []);
@@ -82,6 +83,7 @@ export function createCloud(config, hooks) {
 
   async function attach(user) {
     unsubscribe?.();
+    lastData = null;
     ref = fb.doc(db, 'users', user.uid);
 
     // First time this device sees this account: merge local stats into it once.
@@ -112,8 +114,9 @@ export function createCloud(config, hooks) {
     unsubscribe = fb.onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       const d = snap.data();
+      lastData = { settings: d.settings, settingsAt: d.settingsAt, daily: d.daily };
       // Show cloud stats plus any games still waiting to upload.
-      hooks.onData({ stats: applyResults(d.stats ?? emptyStats(), pending()), settings: d.settings, settingsAt: d.settingsAt, daily: d.daily });
+      hooks.onData({ ...lastData, stats: applyResults(d.stats ?? emptyStats(), pending()) });
     }, fail);
     await flush();
   }
@@ -123,13 +126,18 @@ export function createCloud(config, hooks) {
     if (!ref || flushing) return flushing;
     const queue = pending();
     if (!queue.length) return Promise.resolve();
+    let uploaded = null;
     flushing = fb.runTransaction(db, async (tx) => {
       const snap = await tx.get(ref);
-      const stats = applyResults(snap.data()?.stats ?? emptyStats(), queue);
-      tx.set(ref, { stats, updatedAt: fb.serverTimestamp() }, { merge: true });
+      uploaded = applyResults(snap.data()?.stats ?? emptyStats(), queue);
+      tx.set(ref, { stats: uploaded, updatedAt: fb.serverTimestamp() }, { merge: true });
     }).then(() => {
       // Only remove what was uploaded; more games may have finished meanwhile.
       save('pending', pending().slice(queue.length));
+      // The snapshot listener can see this write before we get here, while these
+      // games were still pending, and count them twice. Show what was just
+      // saved plus what's still waiting instead.
+      if (lastData) hooks.onData({ ...lastData, stats: applyResults(uploaded, pending()) });
       emit({});
     }).catch((err) => {
       console.warn('Sync will retry:', err?.code ?? err);
@@ -142,6 +150,11 @@ export function createCloud(config, hooks) {
     start,
     get state() { return state; },
     get enabled() { return !!config; },
+    /** Get a fresh ID token (after linking Google, the old one doesn't list it yet). */
+    async refreshToken() {
+      await auth?.currentUser?.getIdToken(true);
+    },
+
     /** The uid signed in right now (null between accounts). */
     get uid() { return auth?.currentUser?.uid ?? null; },
 

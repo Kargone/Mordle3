@@ -200,10 +200,12 @@
   <dialog class="sheet" id="stats-dialog" aria-labelledby="stats-title">
     <div class="grab" aria-hidden="true"></div>
     <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
+    <div class="segmented sheet-tabs" role="radiogroup" aria-label="Show" hidden><button type="button" role="radio" data-tab="stats" aria-checked="true">Stats</button><button type="button" role="radio" data-tab="lb" aria-checked="false">Leaderboard</button></div>
     <div class="hero" id="result-hero">
       <h2 class="hero-title" id="stats-title">Statistics</h2>
       <div class="answer-tiles" id="answer-tiles"></div>
       <p class="result-line" id="result-line" hidden></p>
+      <div class="rankcard" id="results-rank" hidden></div>
     </div>
     <div id="stats-body">
       <div class="stats4">
@@ -225,6 +227,20 @@
       <button class="btn btn-secondary" type="button" id="play-random-btn">Play Random</button>
     </div>
     <p class="countdown">Next daily in <b id="countdown">--:--:--</b></p>
+    <section class="lb-panel" id="lb-panel" aria-label="Leaderboard">
+      <div class="lb-boards" id="lb-boards"></div>
+      <div class="lb-head" aria-hidden="true"><span>#</span><span>Player</span><span id="lb-col"></span></div>
+      <div class="lb-list" id="lb-list" aria-live="polite"></div>
+      <div class="lb-you" id="lb-you" hidden>
+        <label class="lb-name">Your name <input id="lb-name" type="text" maxlength="16" autocomplete="nickname" spellcheck="false"></label>
+        <div class="lb-hide"><span aria-hidden="true">Hide me</span><label class="switch"><input type="checkbox" id="lb-hide"><span></span><span class="sr-only">Hide me from leaderboards</span></label></div>
+        <p class="lb-note" id="lb-hidden-note" hidden>You're hidden from the leaderboards.</p>
+      </div>
+      <div class="lb-join" id="lb-join" hidden>
+        <p>Sign in with Google to join the leaderboards.</p>
+        <button class="gbtn" type="button" id="lb-signin" data-icon="google">Sign in</button>
+      </div>
+    </section>
   </dialog>
 
   <!-- Battle: round over -->
@@ -238,6 +254,7 @@
       <p class="round-meta" id="round-meta"></p>
     </div>
     <div class="score-table" id="round-table"></div>
+    <div class="rankcard" id="round-rank" hidden></div>
     <button class="btn btn-primary btn-block" type="button" id="round-next">Next round</button>
     <p class="waiting" id="round-wait"></p>
     <p class="center"><button class="linkbtn" type="button" id="round-end" hidden>End match</button><button class="linkbtn" type="button" id="round-leave">Leave room</button></p>
@@ -247,6 +264,7 @@
   <dialog class="sheet" id="bstats-dialog" aria-labelledby="bstats-title">
     <div class="grab" aria-hidden="true"></div>
     <form method="dialog"><button class="close-btn" aria-label="Close" data-icon="close"></button></form>
+    <div class="segmented sheet-tabs" role="radiogroup" aria-label="Show" hidden><button type="button" role="radio" data-tab="stats" aria-checked="true">Stats</button><button type="button" role="radio" data-tab="lb" aria-checked="false">Leaderboard</button></div>
     <h2 class="hero-title" id="bstats-title">Battle stats</h2>
     <div class="stats4">
       <div><div class="num" id="bst-played">0</div><div class="cap">Matches</div></div>

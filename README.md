@@ -17,6 +17,7 @@ Plain HTML, CSS and JavaScript (ES modules). **No build step and no dependencies
 - **Themes:** Dark and Light (or follow the system setting), plus a high-contrast option.
 - **Saving:** your game picks up where you left off after a refresh (saved in the browser).
 - **Sync (optional):** sign in with Google to keep stats, streaks and settings on every device (Firebase).
+- **Leaderboards (needs Firebase):** Google-signed-in players are listed under their Battle name on four boards: Today's daily (fewest guesses, then fastest), Daily streaks, InfiniMode words solved and Battle wins. The results sheet shows your rank after each game; the Leaderboard tab is in the stats sheets. Anyone can look; **Hide me** takes you off.
 - **Accessibility:** keyboard play, screen-reader labels, and reduced-motion support.
 
 ## Run locally
@@ -66,6 +67,14 @@ Rooms live in Firestore at `rooms/{code}` (4-character codes like `KQ7P`; links 
 - **Co-op:** `settings.game = 'coop'`. No turn object; any player in the room can append a guess (a word already on the board is rejected, since teammates often send the same one at once). Each solved word is recorded once per player as a team result.
 - **Stats:** when a match ends, each player's device records it once (matches, outright wins, rounds won, win streak) plus a win–loss record against each opponent, keyed by their account so name changes don't split it. The 30 most recent rivals are kept. Battle stats sync with the rest of your stats.
 - **Trust:** there's no server checking guesses (that needs Cloud Functions on the Blaze plan). The rules keep strangers out of rooms and stop non-hosts changing settings, but players in a room could cheat. Fine for playing with friends.
+
+## Leaderboards
+
+- **Data:** `leaders/{uid}` holds a public summary of each Google player's stats (name, daily streak, InfiniMode and Battle numbers), rewritten 1.5 seconds after their stats change. `days/{day}/scores/{uid}` holds that day's daily result, posted once; only its name can change later. Hide me deletes both, and the setting syncs.
+- **Ranking:** each board sorts on one field (`score` for today = guesses × 10,000,000 + ms, so fewer guesses wins and time breaks ties), so Firestore's automatic indexes cover every query and no composite index is needed. The rank card uses count queries, which cost one read per 1,000 entries.
+- **Daily time:** Daily now runs the same clock as InfiniMode (not shown on screen). A daily continued from another device isn't posted from this one, since its time would be wrong.
+- **Streaks:** an entry's streak is as of that player's last daily. One that has lapsed counts as 0 on the board.
+- **Trust:** as with Battle, nothing checks results on a server. The rules require a Google-linked account, let each player write only their own entry, and reject impossible values; a determined player could still post a fake score.
 
 ## Project layout
 

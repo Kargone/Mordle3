@@ -4,7 +4,7 @@ import { emptyBucket, emptyBattle, emptyStats, recordGame, trimRivals, mergeInfi
 import { evaluateGuess, MAX_GUESSES } from './game.js';
 
 /** Settings that follow you between devices. Mode is per-device. */
-export const SYNCED_SETTINGS = ['hard', 'theme', 'contrast'];
+export const SYNCED_SETTINGS = ['hard', 'theme', 'contrast', 'lbHidden'];
 
 export function pickSyncedSettings(settings) {
   const out = {};

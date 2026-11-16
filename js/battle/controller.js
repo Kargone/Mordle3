@@ -29,11 +29,13 @@ const ERRORS = {
  *   cloud: object, keyboard: object, toast: (msg: string, ms?: number) => void,
  *   announce: (text: string) => void, onHeader: () => void,
  *   onMatch: (result: object) => void, getStats: () => {battle: object, coop: object},
+ *   onMatchSheet?: (el: HTMLElement) => void, hideRank?: (el: HTMLElement) => void,
  * }} deps
+ * onMatchSheet fills the leaderboard rank card when a Battle match's sheet opens.
  * onMatch gets this player's matchResult() / coopResult() each time a finished
  * match or co-op word is seen (the stats code ignores repeats).
  */
-export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMatch, getStats }) {
+export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMatch, getStats, onMatchSheet = () => {}, hideRank = () => {} }) {
   let api = null;
   let active = false; // battle mode is on screen
   let code = load('battleRoom', null);
@@ -233,6 +235,8 @@ export function createBattle({ cloud, keyboard, toast, announce, onHeader, onMat
       const key = `${room.code}:${room.round}:${room.status}`;
       if (sheetFor !== key) {
         sheetFor = key;
+        if (room.status === 'matchOver' && !isCoop(room)) onMatchSheet($('round-rank'));
+        else hideRank($('round-rank'));
         setTimeout(() => active && room && room.status !== 'playing' && !$('round-dialog').open && $('round-dialog').showModal(), 900);
       }
     }

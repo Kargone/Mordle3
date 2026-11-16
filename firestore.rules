@@ -38,6 +38,54 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid in resource.data.players;
     }
 
+    // Leaderboards. Any signed-in player can read them; only Google-linked accounts
+    // can post, each only their own entry. No server checks results (Spark plan),
+    // so these rules just reject impossible values.
+    function isGoogleUser(uid) {
+      return request.auth != null && request.auth.uid == uid
+        && 'google.com' in request.auth.token.firebase.identities;
+    }
+    function validName(d) {
+      return d.name is string && d.name.size() > 0 && d.name.size() <= 16;
+    }
+    function count(m, k) {
+      return m[k] is int && m[k] >= 0;
+    }
+    match /leaders/{uid} {
+      allow read: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if isGoogleUser(uid)
+        && request.resource.data.keys().hasOnly(['name', 'daily', 'infini', 'battle', 'updatedAt'])
+        && validName(request.resource.data)
+        && request.resource.data.daily.keys().hasOnly(['streak', 'maxStreak', 'played', 'wins', 'lastDay'])
+        && count(request.resource.data.daily, 'streak') && count(request.resource.data.daily, 'maxStreak')
+        && count(request.resource.data.daily, 'played') && count(request.resource.data.daily, 'wins')
+        && count(request.resource.data.daily, 'lastDay')
+        && request.resource.data.daily.wins <= request.resource.data.daily.played
+        && request.resource.data.infini.keys().hasOnly(['solved', 'fewest', 'fastestMs'])
+        && count(request.resource.data.infini, 'solved') && count(request.resource.data.infini, 'fewest')
+        && count(request.resource.data.infini, 'fastestMs')
+        && request.resource.data.battle.keys().hasOnly(['wins', 'played'])
+        && count(request.resource.data.battle, 'wins') && count(request.resource.data.battle, 'played')
+        && request.resource.data.battle.wins <= request.resource.data.battle.played;
+    }
+    // Today's daily: one score per player per day. Posted once; only the name can change after.
+    match /days/{day}/scores/{uid} {
+      allow read: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if isGoogleUser(uid)
+        && request.resource.data.keys().hasOnly(['name', 'guesses', 'won', 'ms', 'score'])
+        && validName(request.resource.data)
+        && request.resource.data.guesses is int && request.resource.data.guesses >= 1 && request.resource.data.guesses <= 6
+        && request.resource.data.won is bool
+        && (request.resource.data.won || request.resource.data.guesses == 6)
+        && request.resource.data.ms is int && request.resource.data.ms >= 0 && request.resource.data.ms <= 9999999
+        && request.resource.data.score == (request.resource.data.won ? request.resource.data.guesses : 7) * 10000000 + request.resource.data.ms;
+      allow update: if isGoogleUser(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && validName(request.resource.data);
+    }
+
     // Everything else is closed.
     match /{document=**} {
       allow read, write: if false;

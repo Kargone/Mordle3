@@ -17,6 +17,9 @@ import { createToaster } from './ui/toast.js';
 import { createResultsSheet, praiseFor } from './ui/results.js';
 import { createAccountUI } from './ui/account.js';
 import { createBattle } from './battle/controller.js';
+import { cleanName } from './battle/logic.js';
+import { createLeaderboard, leaderEntry, todayScore } from './leaderboard.js';
+import { createLeaderboardUI } from './ui/leaderboard.js';
 import { wait } from './ui/motion.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,8 +30,10 @@ const MODES = ['daily', 'random', 'infini', 'battle'];
 const settings = { mode: 'daily', hard: false, theme: 'system', contrast: false, ...load('settings', {}) };
 let stats = { ...emptyStats(), ...load('stats', {}) };
 const games = load('games', {}); // { daily: {day, seed, state}, random: {seed, state, recorded}, infini: {seed, state, clock} }
-// A clock left running when the page closed: that stretch isn't counted.
-if (games.infini?.clock) games.infini.clock.since = null;
+// Daily and InfiniMode are timed (InfiniMode shows its clock; Daily's is for the
+// Today leaderboard). A clock left running when the page closed: that stretch isn't counted.
+const TIMED = ['daily', 'infini'];
+for (const m of TIMED) if (games[m]?.clock) games[m].clock.since = null;
 
 let settingsAt = load('settingsAt', 0); // when synced settings last changed on this device
 const saveSettings = () => save('settings', settings);
@@ -41,7 +46,7 @@ function newSlot(mode, seed) {
     recorded: false,
   };
   if (mode === 'daily') slot.day = dayNumber();
-  if (mode === 'infini') slot.clock = newClock();
+  if (TIMED.includes(mode)) slot.clock = newClock();
   return slot;
 }
 
@@ -78,6 +83,7 @@ const toast = createToaster($('toasts'));
 const results = createResultsSheet();
 
 // ---------- sync ----------
+let lastStatus = null;
 const cloud = createCloud(firebaseConfig, {
   getLocal: () => ({ stats, settings, settingsAt }),
   onData(data) {
@@ -85,6 +91,7 @@ const cloud = createCloud(firebaseConfig, {
       stats = { ...emptyStats(), ...data.stats };
       save('stats', stats);
       if (results.isOpen) openResults();
+      publishSoon();
     }
     const next = newerSettings(settings, settingsAt, data.settings, data.settingsAt);
     if (next) {
@@ -103,19 +110,25 @@ const cloud = createCloud(firebaseConfig, {
   onState(state) {
     account.update(state);
     if (results.isOpen) updateSheetAccount();
+    // Just signed in with Google: put this player on the leaderboards.
+    if (state.status === 'google' && lastStatus !== 'google') { publishSoon(); publishToday(); }
+    if (state.status !== lastStatus) lbUI.refresh();
+    lastStatus = state.status;
   },
 });
 
+async function signIn() {
+  if (!battle.canSwitchAccount) return toast('Leave the Battle room first to sign in', 2400);
+  try {
+    await cloud.signInWithGoogle();
+  } catch (err) {
+    console.warn(err);
+    toast("Couldn't sign in. Try again?");
+  }
+}
+
 const account = createAccountUI({
-  async onSignIn() {
-    if (!battle.canSwitchAccount) return toast('Leave the Battle room first to sign in', 2400);
-    try {
-      await cloud.signInWithGoogle();
-    } catch (err) {
-      console.warn(err);
-      toast("Couldn't sign in. Try again?");
-    }
-  },
+  onSignIn: signIn,
   async onSignOut() {
     if (!battle.canSwitchAccount) return toast('Leave the Battle room first to sign out', 2400);
     await cloud.signOut();
@@ -132,8 +145,108 @@ const battle = createBattle({
     stats = next;
     save('stats', stats);
     cloud.record(result);
+    publishSoon();
   },
+  /** A Battle match just ended: show where you stand. */
+  onMatchSheet(el) {
+    lbUI.rankCard(el, async () => {
+      await publishNow();
+      return { key: 'battle', data: leaderEntry(stats, '', dayNumber()) };
+    });
+  },
+  hideRank: (el) => lbUI.hideCard(el),
 });
+
+// ---------- leaderboards ----------
+// Google-signed-in players are listed automatically (unless they turn on Hide me),
+// under their Battle name.
+const lb = createLeaderboard(cloud);
+const lbName = () => cleanName(load('battleName', '')) || `Player ${(cloud.uid ?? '').slice(0, 4).toUpperCase()}`;
+const lbOn = () => cloud.state.status === 'google' && !settings.lbHidden;
+let publishTimer = null;
+
+/** Save this player's leaderboard entry now (resolves when done; never throws). */
+function publishNow() {
+  clearTimeout(publishTimer);
+  if (!lbOn()) return Promise.resolve();
+  return lb.publish(leaderEntry(stats, lbName(), dayNumber())).catch((err) => console.warn('Leaderboard save failed:', err?.code ?? err));
+}
+/** Stats changed: save the entry shortly (several changes in a row make one write). */
+function publishSoon() {
+  clearTimeout(publishTimer);
+  if (lbOn()) publishTimer = setTimeout(publishNow, 1500);
+}
+
+/** Today's finished daily as {guesses, won, ms}, or null (not finished, or timed on another device). */
+function todayResult() {
+  const slot = games.daily;
+  if (!slot || slot.day !== dayNumber() || slot.state.status === 'playing' || slot.untimed) return null;
+  return { guesses: slot.state.guesses.length, won: slot.state.status === 'won', ms: clockMs(slot.clock, Date.now()) };
+}
+/** Post today's daily (once). Resolves to its score, or null. */
+async function publishToday() {
+  const result = todayResult();
+  if (!result || !lbOn()) return null;
+  const day = dayNumber();
+  if (load('lbToday', 0) !== day) {
+    try {
+      if (await lb.publishToday(day, lbName(), result)) save('lbToday', day);
+    } catch (err) {
+      console.warn('Leaderboard save failed:', err?.code ?? err);
+      return null;
+    }
+  }
+  return todayScore(result);
+}
+
+const lbUI = createLeaderboardUI({
+  lb,
+  today: dayNumber,
+  account: () => ({ google: cloud.state.status === 'google', hidden: !!settings.lbHidden, name: lbName() }),
+  setName(name) {
+    const clean = cleanName(name);
+    if (!clean) return;
+    save('battleName', clean);
+    $('battle-name').value = clean;
+    publishNow();
+    if (lbOn() && load('lbToday', 0) === dayNumber()) lb.rename(dayNumber(), clean).catch(() => {});
+  },
+  async setHidden(hidden) {
+    settings.lbHidden = hidden;
+    touchSettings();
+    save('lbToday', 0);
+    if (hidden) {
+      clearTimeout(publishTimer);
+      await lb.remove(dayNumber()).catch((err) => console.warn('Leaderboard remove failed:', err?.code ?? err));
+    } else {
+      await publishNow();
+      await publishToday();
+    }
+  },
+  onSignIn: signIn,
+});
+document.querySelectorAll('.sheet-tabs').forEach((t) => { t.hidden = !cloud.enabled; });
+lbUI.setDefault($('bstats-dialog'), 'battle');
+$('battle-name').addEventListener('change', publishSoon);
+
+/** Results sheet: where this game puts you. */
+function showRank() {
+  const el = $('results-rank');
+  const { state } = current();
+  if (mode === 'daily' && todayResult()) {
+    lbUI.rankCard(el, async () => {
+      const score = await publishToday();
+      return score && { key: 'today', data: score };
+    });
+  } else if (mode === 'infini' && state.status === 'won') {
+    lbUI.rankCard(el, async () => {
+      await publishNow();
+      return { key: 'infini', data: leaderEntry(stats, '', dayNumber()) };
+    });
+  } else {
+    lbUI.hideCard(el);
+  }
+}
 $('mode-menu').querySelector('[data-mode="battle"]').hidden = !cloud.enabled;
 
 /** Keep whichever copy of today's daily is further along. */
@@ -147,7 +260,7 @@ function syncDaily(remoteData = lastRemoteDaily) {
   const pick = pickDaily(local, remote);
   if (pick === 'local') cloud.pushDaily(encodeDaily(local));
   if (pick !== 'remote') return;
-  games.daily = remote;
+  games.daily = { ...remote, untimed: true }; // played (at least partly) on another device: no fair time here
   saveGames();
   if (mode === 'daily') {
     renderAll();
@@ -188,32 +301,41 @@ function renderHeader() {
   });
 }
 
-// ---------- InfiniMode clock ----------
-// Runs from the first letter typed until the word is solved, only while InfiniMode
+// ---------- play clocks (Daily, InfiniMode) ----------
+// Runs from the first letter typed until the game ends, only while that mode
 // is on screen and the page is visible.
 let clockTimer = null;
 const clockStarted = (slot) => slot.state.guesses.length > 0 || slot.state.current.length > 0 || slot.clock?.ms > 0;
 function syncClock() {
-  const slot = games.infini;
-  if (!slot) return;
-  slot.clock ??= newClock();
-  const s = slot.state;
-  const run = mode === 'infini' && !document.hidden && s.status === 'playing' && clockStarted(slot);
   const now = Date.now();
-  const next = run ? startClock(slot.clock, now) : stopClock(slot.clock, now);
-  if (next !== slot.clock) { slot.clock = next; saveGames(); }
+  let running = false;
+  let changed = false;
+  for (const m of TIMED) {
+    const slot = games[m];
+    if (!slot) continue;
+    slot.clock ??= newClock();
+    const run = mode === m && !document.hidden && slot.state.status === 'playing' && clockStarted(slot);
+    const next = run ? startClock(slot.clock, now) : stopClock(slot.clock, now);
+    if (next !== slot.clock) { slot.clock = next; changed = true; }
+    running ||= run;
+  }
+  if (changed) saveGames();
   renderClock();
   clearInterval(clockTimer);
   let ticks = 0;
-  clockTimer = run ? setInterval(() => { renderClock(); if (++ticks % 5 === 0) bankClock(); }, 1000) : null;
+  clockTimer = running ? setInterval(() => { renderClock(); if (++ticks % 5 === 0) bankClock(); }, 1000) : null;
 }
 /** Save the time so far (a running stretch is lost if the page closes without a pause). */
 function bankClock() {
-  const slot = games.infini;
-  if (slot?.clock?.since == null) return;
   const now = Date.now();
-  slot.clock = startClock(stopClock(slot.clock, now), now);
-  saveGames();
+  let changed = false;
+  for (const m of TIMED) {
+    const slot = games[m];
+    if (slot?.clock?.since == null) continue;
+    slot.clock = startClock(stopClock(slot.clock, now), now);
+    changed = true;
+  }
+  if (changed) saveGames();
 }
 window.addEventListener('pagehide', bankClock);
 function renderClock() {
@@ -266,7 +388,7 @@ async function handleKey(key) {
     slot.state = next;
     board.render(next);
     board.pop(next.guesses.length, next.current.length - 1);
-    if (mode === 'infini' && slot.clock?.since == null) syncClock(); // first letter starts the clock
+    if (TIMED.includes(mode) && slot.clock?.since == null) syncClock(); // first letter starts the clock
     saveGames();
     return;
   }
@@ -282,7 +404,7 @@ async function handleKey(key) {
 
   busy = true;
   slot.state = next;
-  if (mode === 'infini') syncClock(); // stops on the answer
+  if (TIMED.includes(mode)) syncClock(); // stops when the game ends
   saveGames(); // persist before animating so a refresh can't lose the guess
   if (mode === 'daily') cloud.pushDaily(encodeDaily(slot));
   board.render(next, { skipRow: row });
@@ -324,6 +446,7 @@ function finishGame(slot) {
     save('stats', stats);
     cloud.record(result);
     saveGames();
+    publishSoon();
     return;
   }
   stats = recordGame(stats, {
@@ -336,12 +459,15 @@ function finishGame(slot) {
   save('stats', stats);
   cloud.record({ mode: mode === 'daily' ? 'daily' : 'random', won: state.status === 'won', guesses: state.guesses.length, day: slot.day });
   saveGames();
+  publishSoon();
 }
 
 function openResults() {
   if (mode === 'battle') return battle.openSheet();
   results.open({ mode, state: current().state, stats, today: dayNumber(), slot: current() });
   updateSheetAccount();
+  lbUI.setDefault($('stats-dialog'), { daily: 'today', infini: 'infini' }[mode] ?? 'daily');
+  showRank();
 }
 
 function updateSheetAccount() {
