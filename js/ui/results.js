@@ -6,10 +6,10 @@ import { clockMs, formatTime } from '../clock.js';
 import { msUntilNextDay } from '../daily.js';
 import { createTile } from './board.js';
 
-const PRAISE = ['Unreal!', 'Brilliant!', 'Sharp!', 'Nice one!', 'Solid!', 'Clutch!'];
+const PRAISE = ['Unreal!', 'Brilliant!', 'Sharp!', 'Nice one!', 'Solid!', 'Clutch!', 'How did you do it in 7 guesses?'];
 
 export function praiseFor(guessCount, infinite) {
-  if (infinite && guessCount > MAX_GUESSES) return `Got it in ${guessCount}!`;
+  if (infinite && guessCount > MAX_GUESSES) return `Let's go! Got it in ${guessCount}!`;
   return PRAISE[guessCount - 1] ?? 'Got it!';
 }
 
